@@ -1,4 +1,4 @@
-name: Deploy Starship SysAdmin to GitHub Pages
+name: Deploy Dylan Grow's PowerShell Challenge to GitHub Pages
 
 on:
   push:
