@@ -1,0 +1,25 @@
+{
+  "name": "Starship SysAdmin: The PowerShell Odyssey",
+  "short_name": "StarshipSysAdmin",
+  "description": "Learn PowerShell through an interactive sci-fi space station simulation game.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "games", "productivity"]
+}
