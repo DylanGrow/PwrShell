@@ -1,6 +1,5 @@
 (function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const r of document.querySelectorAll('link[rel="modulepreload"]'))e(r);new MutationObserver(r=>{for(const i of r)if(i.type==="childList")for(const n of i.addedNodes)n.tagName==="LINK"&&n.rel==="modulepreload"&&e(n)}).observe(document,{childList:!0,subtree:!0});function s(r){const i={};return r.integrity&&(i.integrity=r.integrity),r.referrerPolicy&&(i.referrerPolicy=r.referrerPolicy),r.crossOrigin==="use-credentials"?i.credentials="include":r.crossOrigin==="anonymous"?i.credentials="omit":i.credentials="same-origin",i}function e(r){if(r.ep)return;r.ep=!0;const i=s(r);fetch(r.href,i)}})();class T{files=new Map;currentPath="C:\\Users\\student";constructor(){this.reset()}reset(){this.files.clear(),this.currentPath="C:\\Users\\Dylan",this.createDirectory("C:"),this.createDirectory("C:\\Users"),this.createDirectory("C:\\Users\\Dylan"),this.createDirectory("C:\\Users\\Dylan\\backup"),this.createDirectory("C:\\Users\\Dylan\\projects"),this.createDirectory("C:\\Users\\Dylan\\scripts"),this.createDirectory("C:\\Users\\Dylan\\temp"),this.createDirectory("C:\\Users\\student"),this.createDirectory("C:\\Users\\student\\backup"),this.createDirectory("C:\\Users\\student\\projects"),this.createDirectory("C:\\Users\\student\\scripts"),this.createDirectory("C:\\Users\\student\\temp");const t=s=>{this.writeFile(`${s}\\welcome.txt`,`Welcome Dylan Grow to PowerShell Command Challenge!
-Learn real-world PowerShell cmdlets, pipelines, and object scripting.
-Engineered with Antigravity.`),this.writeFile(`${s}\\notes.txt`,`Meeting notes:
+Learn real-world PowerShell cmdlets, pipelines, and object scripting.`),this.writeFile(`${s}\\notes.txt`,`Meeting notes:
 - Review server logs
 - Deploy backup routine
 - Audit admin accounts
@@ -346,9 +345,7 @@ clark kent`),this.writeFile(`${s}\\temp\\cache_01.tmp`,"cache_data_01"),this.wri
               <span>Designed &amp; Built for <strong>Dylan Grow</strong></span>
             </div>
             <span class="footer-dot">•</span>
-            <span>PowerShell Command Challenge Engine</span>
-            <span class="footer-dot">•</span>
-            <span>Crafted with Antigravity</span>
+            <span>PowerShell Command Challenge</span>
           </div>
         </footer>
       </div>

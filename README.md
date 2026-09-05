@@ -50,4 +50,4 @@ npx tsx test/powershell_catalog.test.ts
 
 ## 📄 License
 
-MIT © Dylan Grow • Crafted with Antigravity Engine
+MIT © Dylan Grow • PowerShell Command Challenge

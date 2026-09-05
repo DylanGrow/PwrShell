@@ -488,9 +488,7 @@ export class CmdSite {
               <span>Designed &amp; Built for <strong>Dylan Grow</strong></span>
             </div>
             <span class="footer-dot">•</span>
-            <span>PowerShell Command Challenge Engine</span>
-            <span class="footer-dot">•</span>
-            <span>Crafted with Antigravity</span>
+            <span>PowerShell Command Challenge</span>
           </div>
         </footer>
       </div>

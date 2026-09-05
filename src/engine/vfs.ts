@@ -37,7 +37,7 @@ export class VirtualFileSystem {
 
     // Preloaded Files for Dylan Grow & student
     const preload = (base: string) => {
-      this.writeFile(`${base}\\welcome.txt`, 'Welcome Dylan Grow to PowerShell Command Challenge!\nLearn real-world PowerShell cmdlets, pipelines, and object scripting.\nEngineered with Antigravity.');
+      this.writeFile(`${base}\\welcome.txt`, 'Welcome Dylan Grow to PowerShell Command Challenge!\nLearn real-world PowerShell cmdlets, pipelines, and object scripting.');
       this.writeFile(`${base}\\notes.txt`, 'Meeting notes:\n- Review server logs\n- Deploy backup routine\n- Audit admin accounts\n- Upgrade PowerShell to 7.4');
       this.writeFile(`${base}\\.hidden_credentials.txt`, 'API_KEY=ps_secret_998877\nDB_PASS=correct_horse_battery', true);
       this.writeFile(`${base}\\access.log`, 
