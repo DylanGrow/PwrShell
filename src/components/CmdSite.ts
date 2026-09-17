@@ -4,6 +4,9 @@ import { createDefaultState } from '../state/gameState';
 import { ChallengesCatalog, CmdChallenge } from '../challenges/catalog';
 import { Formatters } from '../engine/formatters';
 import { PSObject } from '../engine/psobject';
+import { SyntaxHighlighter } from './SyntaxHighlighter';
+import { GridViewModal } from './GridViewModal';
+import { CertificateModal } from './CertificateModal';
 
 export class CmdSite {
   private container: HTMLElement;
@@ -12,8 +15,15 @@ export class CmdSite {
 
   private currentId: number = 1;
   private solvedIds: Set<number> = new Set();
+  private personalBests: Record<number, number> = {};
   private history: string[] = [];
   private historyIndex: number = -1;
+
+  // Reverse history search (Ctrl+R)
+  private isReverseSearch: boolean = false;
+  private reverseSearchQuery: string = '';
+  private reverseSearchMatchedCmd: string = '';
+  private reverseSearchMatchIndex: number = -1;
 
   private showLearn: boolean = false;
   private showSolutions: boolean = false;
@@ -28,10 +38,10 @@ export class CmdSite {
     'Get-ChildItem', 'Get-Content', 'Set-Content', 'Add-Content', 'New-Item', 'Remove-Item', 'Copy-Item',
     'Get-Location', 'Set-Location', 'Test-Path', 'Split-Path', 'Join-Path', 'Get-Item',
     'Select-String', 'Where-Object', 'Select-Object', 'Sort-Object', 'Measure-Object', 'Group-Object', 'ForEach-Object',
-    'Compare-Object', 'Tee-Object', 'Out-File', 'Get-Command', 'Get-Help', 'Get-Variable', 'Set-Variable',
+    'Compare-Object', 'Tee-Object', 'Out-File', 'Out-GridView', 'Get-Command', 'Get-Help', 'Get-Variable', 'Set-Variable',
     'Import-Csv', 'Export-Csv', 'ConvertFrom-Json', 'ConvertTo-Json',
     'Get-Process', 'Get-Service', 'Get-Date', 'Get-Random', 'Write-Output', 'Clear-Host',
-    'dir', 'ls', 'cat', 'gc', 'sc', 'sls', 'grep', 'ps', 'gps', 'gsv', 'pwd', 'gl', 'cd', 'echo', 'diff', 'tee',
+    'dir', 'ls', 'cat', 'gc', 'sc', 'sls', 'grep', 'ps', 'gps', 'gsv', 'pwd', 'gl', 'cd', 'echo', 'diff', 'tee', 'ogv', 'grid',
     '$PSVersionTable', '$PSVersionTable.PSVersion', '$PWD', '$PROFILE',
     '-Path', '-Filter', '-Recurse', '-Force', '-Pattern', '-Property', '-ExpandProperty',
     '-First', '-Last', '-Unique', '-Descending', '-Sum', '-Average', '-Line', '-Format',
@@ -131,6 +141,10 @@ export class CmdSite {
       if (snd !== null) {
         this.soundEnabled = snd === 'true';
       }
+      const bests = localStorage.getItem('ps_cmdchallenge_bests');
+      if (bests) {
+        this.personalBests = JSON.parse(bests);
+      }
     } catch {
       // Ignore
     }
@@ -141,9 +155,34 @@ export class CmdSite {
       localStorage.setItem('ps_cmdchallenge_solved', JSON.stringify(Array.from(this.solvedIds)));
       localStorage.setItem('ps_cmdchallenge_current', String(this.currentId));
       localStorage.setItem('ps_cmdchallenge_sound', String(this.soundEnabled));
+      localStorage.setItem('ps_cmdchallenge_bests', JSON.stringify(this.personalBests));
     } catch {
       // Ignore
     }
+  }
+
+  public getStarsForChallenge(chId: number): number {
+    if (!this.solvedIds.has(chId)) return 0;
+    const ch = ChallengesCatalog.find(c => c.id === chId);
+    if (!ch) return 1;
+    const best = this.personalBests[chId];
+    if (!best) return 1;
+
+    const solLengths = ch.solutions.map(s => s.length);
+    const minLen = Math.min(...solLengths);
+    const maxLen = Math.max(...solLengths);
+
+    if (best <= minLen) return 3;
+    if (best <= maxLen + 5) return 2;
+    return 1;
+  }
+
+  public getTotalStars(): number {
+    let sum = 0;
+    for (const id of this.solvedIds) {
+      sum += this.getStarsForChallenge(id);
+    }
+    return sum;
   }
 
   private getDylanRank(): { title: string; color: string; icon: string } {
@@ -166,6 +205,7 @@ export class CmdSite {
     this.showSolutions = false;
     this.showFiles = false;
     this.showCatalog = false;
+    this.isReverseSearch = false;
     this.saveProgress();
     this.vfs.reset();
     this.render();
@@ -189,30 +229,40 @@ export class CmdSite {
     const isSolved = this.solvedIds.has(ch.id);
     const progressPercent = Math.round((this.solvedIds.size / ChallengesCatalog.length) * 100);
     const rank = this.getDylanRank();
+    const totalStars = this.getTotalStars();
+    const maxStars = ChallengesCatalog.length * 3;
 
-    // Challenge badges
+    // Challenge badges with Stars
     const badgesHtml = ChallengesCatalog.map(c => {
       const isCur = c.id === this.currentId;
       const isDone = this.solvedIds.has(c.id);
+      const stars = this.getStarsForChallenge(c.id);
       let cls = 'ch-badge';
       if (isCur) cls += ' active';
       if (isDone) cls += ' solved';
 
+      let starIcons = '';
+      if (stars === 3) starIcons = '⭐⭐⭐';
+      else if (stars === 2) starIcons = '⭐⭐';
+      else if (stars === 1) starIcons = '⭐';
+
       return `
-        <button class="${cls}" data-id="${c.id}" title="${c.id}. ${c.title} (${c.difficulty})">
+        <button class="${cls}" data-id="${c.id}" title="${c.id}. ${c.title} (${c.difficulty}) ${starIcons}">
           ${isDone ? '<span class="ch-check">✓</span>' : ''}
           <span class="badge-num">${c.id}</span>
           <span class="badge-slug">${c.slug}</span>
+          ${stars > 0 ? `<span class="badge-stars">${'★'.repeat(stars)}</span>` : ''}
         </button>
       `;
     }).join('');
 
-    // Solutions HTML
+    // Solutions HTML with Golf lengths
     const solutionsHtml = ch.solutions.map(s => `
       <div class="sol-item">
         <div class="sol-code-wrap">
           <span class="sol-dollar">PS&gt;</span>
           <code>${this.escapeHtml(s)}</code>
+          <span class="sol-char-len">[${s.length} chars]</span>
         </div>
         <button class="btn-try-sol" data-cmd="${this.escapeHtml(s)}">Run ➔</button>
       </div>
@@ -245,7 +295,7 @@ export class CmdSite {
       </div>
     `).join('');
 
-    // Catalog filtered list
+    // Catalog filtered list with Stars
     const filteredCatalog = ChallengesCatalog.filter(c => {
       if (!this.catalogSearchQuery) return true;
       const q = this.catalogSearchQuery.toLowerCase();
@@ -258,6 +308,7 @@ export class CmdSite {
 
     const catalogListHtml = filteredCatalog.map(c => {
       const isDone = this.solvedIds.has(c.id);
+      const stars = this.getStarsForChallenge(c.id);
       return `
         <div class="catalog-item ${c.id === this.currentId ? 'current' : ''}" data-id="${c.id}">
           <div class="cat-item-left">
@@ -265,11 +316,16 @@ export class CmdSite {
             ${isDone ? '<span class="ch-check">✓</span>' : ''}
             <span class="cat-item-slug">${c.slug}</span>
             <span class="diff-chip diff-${c.difficulty.toLowerCase()}">${c.difficulty}</span>
+            ${stars > 0 ? `<span class="cat-item-stars">${'★'.repeat(stars)}</span>` : ''}
           </div>
           <span class="cat-item-prompt">${this.escapeHtml(c.prompt)}</span>
         </div>
       `;
     }).join('');
+
+    const currentBest = this.personalBests[ch.id];
+    const bestStars = this.getStarsForChallenge(ch.id);
+    const minSolLen = Math.min(...ch.solutions.map(s => s.length));
 
     this.container.innerHTML = `
       <div class="cmd-page">
@@ -294,12 +350,22 @@ export class CmdSite {
             </div>
 
             <div class="header-right">
+              <!-- Star Rating Total -->
+              <div class="stars-counter-box" title="${totalStars} of ${maxStars} possible golf stars earned">
+                <span class="stars-icon">⭐</span>
+                <span class="stars-text">${totalStars} / ${maxStars}</span>
+              </div>
+
               <div class="progress-container" title="${this.solvedIds.size} of ${ChallengesCatalog.length} completed">
                 <div class="progress-bar-bg">
                   <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
                 </div>
                 <span class="progress-label">${this.solvedIds.size} / ${ChallengesCatalog.length} (${progressPercent}%)</span>
               </div>
+
+              <button class="nav-btn cert-nav-btn" id="btn-open-cert" title="View Dylan Grow's Official Certificate of Mastery">
+                🏆 Certificate
+              </button>
 
               <button class="nav-btn ${this.soundEnabled ? 'active' : ''}" id="btn-toggle-sound" title="Toggle audio effects">
                 ${this.soundEnabled ? '🔊 Sound' : '🔇 Mute'}
@@ -340,6 +406,15 @@ export class CmdSite {
                 <span class="category-chip cat-${ch.category.toLowerCase().replace(/[^a-z]/g, '')}">${ch.category}</span>
                 <span class="diff-chip diff-${ch.difficulty.toLowerCase()}">${ch.difficulty}</span>
                 <span class="ch-slug-pill">${ch.slug}</span>
+                ${currentBest ? `
+                  <span class="golf-par-pill" title="Personal Best: ${currentBest} chars (Golf Target: ${minSolLen} chars)">
+                    🏌️ Best: ${currentBest}c ${'★'.repeat(bestStars)}
+                  </span>
+                ` : `
+                  <span class="golf-par-pill" title="Golf target for 3 stars">
+                    🏌️ Golf Par: ${minSolLen}c
+                  </span>
+                `}
               </div>
               <div class="ch-controls">
                 <button class="toggle-link ${this.showFiles ? 'active' : ''}" id="btn-toggle-files">
@@ -392,20 +467,28 @@ export class CmdSite {
               <div class="solutions-drawer animate-slide">
                 <div class="drawer-header">
                   <span class="drawer-icon">✨</span>
-                  <span class="drawer-heading">Verified Solutions</span>
+                  <span class="drawer-heading">Verified Solutions &amp; Code-Golf Pars</span>
                 </div>
                 <div class="drawer-body">${solutionsHtml}</div>
               </div>
             ` : ''}
 
-            <!-- Correct Banner -->
+            <!-- Correct Banner with Golf Stars -->
             ${isSolved ? `
               <div class="correct-banner animate-slide">
                 <div class="correct-left">
-                  <span class="correct-icon">✓</span>
+                  <div class="correct-badge-wrap">
+                    <span class="correct-icon">✓</span>
+                  </div>
                   <div>
-                    <span class="correct-title">CORRECT!</span>
-                    <span class="correct-desc">Nicely done, Dylan! Challenge #${ch.id} verified.</span>
+                    <div class="correct-title-row">
+                      <span class="correct-title">CORRECT!</span>
+                      <span class="correct-stars-text">${'★'.repeat(bestStars || 1)}</span>
+                    </div>
+                    <span class="correct-desc">
+                      Nicely done, Dylan! Challenge #${ch.id} verified. 
+                      ${currentBest ? `Best: <strong>${currentBest} chars</strong> (Golf target: ${minSolLen} chars)` : ''}
+                    </span>
                   </div>
                 </div>
                 ${this.currentId < ChallengesCatalog.length ? `
@@ -424,6 +507,7 @@ export class CmdSite {
                 </div>
                 <div class="term-window-title">PowerShell 7.4 — C:\\Users\\Dylan — 80×24</div>
                 <div class="term-right-tools">
+                  <span class="reverse-search-hint" title="Press Ctrl+R to search previous command history">Ctrl+R Search</span>
                   <span id="term-char-counter" class="char-counter">0 chars</span>
                   <button class="term-clear-btn" id="btn-term-clear" title="Clear terminal output (Ctrl+L)">Clear</button>
                 </div>
@@ -432,22 +516,30 @@ export class CmdSite {
               <div class="term-screen" id="term-output-area" role="log" aria-live="polite">
                 <div class="term-line info-text">PowerShell 7.4.2 [Client-Side Simulation Engine]</div>
                 <div class="term-line info-text">Workspace: C:\\Users\\Dylan | User: Dylan Grow</div>
-                <div class="term-line info-text">Type your PowerShell command below and press Enter. (Tab for autocomplete)</div>
+                <div class="term-line info-text">💡 Tip: Press <code>Ctrl+R</code> to search history. Pipe to <code>Out-GridView</code> (<code>ogv</code>) for GUI table!</div>
               </div>
 
+              <!-- Terminal Input Row with Real-Time Syntax Overlay -->
               <div class="term-input-row">
-                <span class="term-ps-prompt">PS C:\\Users\\Dylan&gt;</span>
-                <input
-                  type="text"
-                  id="cmd-term-input"
-                  class="term-input-field"
-                  autocomplete="off"
-                  autocorrect="off"
-                  autocapitalize="off"
-                  spellcheck="false"
-                  placeholder="Type PowerShell command here (e.g. ${this.escapeHtml(ch.solutions[0])})..."
-                  aria-label="PowerShell command line input"
-                />
+                <span class="term-ps-prompt" id="term-prompt-label">
+                  ${this.isReverseSearch 
+                    ? `<span class="reverse-search-label">(reverse-i-search)\`<b>${this.escapeHtml(this.reverseSearchQuery)}</b>\`:</span>` 
+                    : `PS C:\\Users\\Dylan&gt;`}
+                </span>
+                <div class="term-input-box-wrap">
+                  <div class="term-syntax-overlay" id="term-syntax-overlay" aria-hidden="true"></div>
+                  <input
+                    type="text"
+                    id="cmd-term-input"
+                    class="term-input-field"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    placeholder="${this.isReverseSearch ? 'Type to search previous commands (Enter to run, Esc to cancel)...' : `Type PowerShell command here (e.g. ${this.escapeHtml(ch.solutions[0])})...`}"
+                    aria-label="PowerShell command line input"
+                  />
+                </div>
                 <button class="term-run-btn" id="btn-submit-cmd" title="Execute command">Enter ↵</button>
               </div>
             </div>
@@ -509,6 +601,19 @@ export class CmdSite {
 
     this.container.querySelector('#btn-nav-next')?.addEventListener('click', () => {
       if (this.currentId < ChallengesCatalog.length) this.selectChallenge(this.currentId + 1);
+    });
+
+    // Certificate button
+    this.container.querySelector('#btn-open-cert')?.addEventListener('click', () => {
+      const stats = {
+        solvedCount: this.solvedIds.size,
+        totalCount: ChallengesCatalog.length,
+        totalStars: this.getTotalStars(),
+        maxStars: ChallengesCatalog.length * 3,
+        rankTitle: this.getDylanRank().title
+      };
+      const certModal = new CertificateModal(stats);
+      certModal.show();
     });
 
     // Sound toggle
@@ -594,6 +699,7 @@ export class CmdSite {
     this.container.querySelector('#btn-reset-progress')?.addEventListener('click', () => {
       if (confirm('Reset your progress back to challenge 1?')) {
         this.solvedIds.clear();
+        this.personalBests = {};
         this.currentId = 1;
         this.saveProgress();
         this.selectChallenge(1);
@@ -657,32 +763,81 @@ export class CmdSite {
     this.container.querySelector('#btn-submit-cmd')?.addEventListener('click', () => {
       const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
       if (input && input.value.trim()) {
-        const cmd = input.value.trim();
+        const cmd = this.isReverseSearch && this.reverseSearchMatchedCmd ? this.reverseSearchMatchedCmd : input.value.trim();
+        this.exitReverseSearch();
         this.history.push(cmd);
         this.historyIndex = this.history.length;
         input.value = '';
-        this.updateCharCounter('');
+        this.updateSyntaxAndCounter('');
         this.playClickSound();
         this.runCommand(cmd);
       }
     });
 
-    // Terminal input handling
+    // Terminal input handling with Real-Time Syntax Highlighting & Ctrl+R
     const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
+    const overlay = this.container.querySelector('#term-syntax-overlay') as HTMLElement;
+
     if (input) {
       input.addEventListener('input', () => {
-        this.updateCharCounter(input.value);
+        if (this.isReverseSearch) {
+          this.handleReverseSearchInput(input.value);
+        } else {
+          this.updateSyntaxAndCounter(input.value);
+        }
+      });
+
+      input.addEventListener('scroll', () => {
+        if (overlay) {
+          overlay.scrollLeft = input.scrollLeft;
+        }
       });
 
       input.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Ctrl+R Reverse history search
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+          e.preventDefault();
+          if (!this.isReverseSearch) {
+            this.isReverseSearch = true;
+            this.reverseSearchQuery = input.value;
+            this.reverseSearchMatchIndex = -1;
+            this.updateReverseSearchPrompt();
+            this.handleReverseSearchInput(input.value);
+          } else {
+            // Find next older match
+            this.findNextReverseMatch();
+          }
+          return;
+        }
+
+        if (this.isReverseSearch) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            this.exitReverseSearch();
+            return;
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            const cmd = this.reverseSearchMatchedCmd;
+            this.exitReverseSearch();
+            input.value = cmd;
+            this.updateSyntaxAndCounter(cmd);
+            return;
+          }
+        }
+
         if (e.key === 'Enter') {
           e.preventDefault();
-          const cmd = input.value.trim();
+          const cmd = this.isReverseSearch && this.reverseSearchMatchedCmd 
+            ? this.reverseSearchMatchedCmd 
+            : input.value.trim();
+
+          this.exitReverseSearch();
           if (cmd) {
             this.history.push(cmd);
             this.historyIndex = this.history.length;
             input.value = '';
-            this.updateCharCounter('');
+            this.updateSyntaxAndCounter('');
             this.playClickSound();
             this.runCommand(cmd);
           }
@@ -694,18 +849,18 @@ export class CmdSite {
           if (this.history.length > 0 && this.historyIndex > 0) {
             this.historyIndex--;
             input.value = this.history[this.historyIndex];
-            this.updateCharCounter(input.value);
+            this.updateSyntaxAndCounter(input.value);
           }
         } else if (e.key === 'ArrowDown') {
           e.preventDefault();
           if (this.historyIndex < this.history.length - 1) {
             this.historyIndex++;
             input.value = this.history[this.historyIndex];
-            this.updateCharCounter(input.value);
+            this.updateSyntaxAndCounter(input.value);
           } else {
             this.historyIndex = this.history.length;
             input.value = '';
-            this.updateCharCounter('');
+            this.updateSyntaxAndCounter('');
           }
         } else if (e.key === 'l' && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
@@ -721,10 +876,84 @@ export class CmdSite {
     });
   }
 
-  private updateCharCounter(val: string): void {
+  private handleReverseSearchInput(q: string): void {
+    this.reverseSearchQuery = q;
+    this.reverseSearchMatchIndex = -1;
+    this.findNextReverseMatch();
+  }
+
+  private findNextReverseMatch(): void {
+    const q = this.reverseSearchQuery.toLowerCase();
+    const startIndex = this.reverseSearchMatchIndex === -1 ? this.history.length - 1 : this.reverseSearchMatchIndex - 1;
+
+    let matched = '';
+    let foundIndex = -1;
+
+    if (q) {
+      for (let i = startIndex; i >= 0; i--) {
+        if (this.history[i].toLowerCase().includes(q)) {
+          matched = this.history[i];
+          foundIndex = i;
+          break;
+        }
+      }
+    }
+
+    this.reverseSearchMatchedCmd = matched;
+    this.reverseSearchMatchIndex = foundIndex;
+    this.updateReverseSearchPrompt();
+  }
+
+  private updateReverseSearchPrompt(): void {
+    const promptLabel = this.container.querySelector('#term-prompt-label');
+    const overlay = this.container.querySelector('#term-syntax-overlay') as HTMLElement;
+    const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
+
+    if (promptLabel) {
+      if (this.isReverseSearch) {
+        promptLabel.innerHTML = `<span class="reverse-search-label">(reverse-i-search)\`<b>${this.escapeHtml(this.reverseSearchQuery)}</b>\`:</span>`;
+      } else {
+        promptLabel.innerHTML = `PS C:\\Users\\Dylan&gt;`;
+      }
+    }
+
+    if (this.isReverseSearch) {
+      if (overlay) {
+        if (this.reverseSearchMatchedCmd) {
+          overlay.innerHTML = `<span class="reverse-matched-cmd">${this.escapeHtml(this.reverseSearchMatchedCmd)}</span>`;
+        } else {
+          overlay.innerHTML = `<span class="reverse-no-match">[no match]</span>`;
+        }
+      }
+    } else {
+      if (input && overlay) {
+        overlay.innerHTML = SyntaxHighlighter.highlight(input.value);
+      }
+    }
+  }
+
+  private exitReverseSearch(): void {
+    if (!this.isReverseSearch) return;
+    this.isReverseSearch = false;
+    this.reverseSearchQuery = '';
+    this.reverseSearchMatchedCmd = '';
+    this.reverseSearchMatchIndex = -1;
+    this.updateReverseSearchPrompt();
+    const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
+    if (input) {
+      this.updateSyntaxAndCounter(input.value);
+    }
+  }
+
+  private updateSyntaxAndCounter(val: string): void {
     const counter = this.container.querySelector('#term-char-counter') as HTMLElement;
     if (counter) {
       counter.innerText = `${val.length} chars`;
+    }
+
+    const overlay = this.container.querySelector('#term-syntax-overlay') as HTMLElement;
+    if (overlay) {
+      overlay.innerHTML = SyntaxHighlighter.highlight(val);
     }
   }
 
@@ -741,7 +970,7 @@ export class CmdSite {
     if (matches.length === 1) {
       parts[parts.length - 1] = matches[0];
       input.value = parts.join(' ') + ' ';
-      this.updateCharCounter(input.value);
+      this.updateSyntaxAndCounter(input.value);
     } else if (matches.length > 1) {
       const outputArea = this.container.querySelector('#term-output-area') as HTMLElement;
       if (outputArea) {
@@ -766,6 +995,20 @@ export class CmdSite {
 
     try {
       const res = await this.executor.execute(cmd);
+
+      // Check for Out-GridView interception
+      if (res.output && res.output.length > 0 && res.output[0]?.__isGridView) {
+        const gvPayload = res.output[0];
+        const gvModal = new GridViewModal(gvPayload);
+        gvModal.show();
+
+        const gvLine = document.createElement('div');
+        gvLine.className = 'term-line info-text';
+        gvLine.innerText = `[Out-GridView] Displayed interactive window '${gvPayload.title}' with ${gvPayload.rows.length} rows.`;
+        outputArea.appendChild(gvLine);
+        outputArea.scrollTop = outputArea.scrollHeight;
+        return;
+      }
 
       if (res.error) {
         const errLine = document.createElement('div');
@@ -802,12 +1045,22 @@ export class CmdSite {
 
       if (passed) {
         this.solvedIds.add(ch.id);
+
+        // Update personal best character count
+        const prevBest = this.personalBests[ch.id];
+        if (!prevBest || cmd.length < prevBest) {
+          this.personalBests[ch.id] = cmd.length;
+        }
+
         this.saveProgress();
         this.playSuccessSound();
 
+        const stars = this.getStarsForChallenge(ch.id);
+        const starText = '★'.repeat(stars);
+
         const successLine = document.createElement('div');
         successLine.className = 'term-line correct-text';
-        successLine.innerText = `CORRECT! [Challenge #${ch.id} Solved: ${cmd.length} chars]`;
+        successLine.innerText = `CORRECT! [Challenge #${ch.id} Solved: ${cmd.length} chars • ${starText}]`;
         outputArea.appendChild(successLine);
 
         // Refresh UI banner

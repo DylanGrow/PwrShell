@@ -140,5 +140,54 @@ export const SystemCmdlets: Record<string, CmdletDefinition> = {
       const val = Math.floor(Math.random() * (max - min)) + min;
       return [val];
     }
+  },
+
+  'Out-GridView': {
+    name: 'Out-GridView',
+    aliases: ['ogv', 'grid'],
+    synopsis: 'Sends output to an interactive table in a separate window.',
+    description: 'Displays input objects in an interactive grid view with column sorting and filtering.',
+    syntax: 'Out-GridView [[-Title] <String>] [-PassThru]',
+    parameters: [
+      { name: 'Title', type: 'String', required: false, positional: true, description: 'Title of the window.' },
+      { name: 'PassThru', type: 'Switch', required: false, description: 'Passes selected items down pipeline.' }
+    ],
+    examples: ['Get-Process | Out-GridView', 'Import-Csv employees.csv | ogv -Title "Staff Grid"'],
+    execute: (input: any[], args: CommandArgument[], _context: ExecutionContext) => {
+      let title = 'PowerShell Grid View';
+      for (const a of args) {
+        if (!a.name || a.name.toLowerCase() === 'title') title = String(a.value);
+      }
+
+      const rows: Record<string, any>[] = [];
+      const columnsSet = new Set<string>();
+
+      for (const item of input) {
+        if (item instanceof PSObject) {
+          const dict: Record<string, any> = {};
+          for (const prop of item.getProperties()) {
+            dict[prop.name] = prop.value;
+            columnsSet.add(prop.name);
+          }
+          rows.push(dict);
+        } else if (typeof item === 'object' && item !== null) {
+          rows.push(item);
+          Object.keys(item).forEach(k => columnsSet.add(k));
+        } else {
+          rows.push({ Value: item });
+          columnsSet.add('Value');
+        }
+      }
+
+      const gridPayload = {
+        __isGridView: true,
+        title,
+        columns: Array.from(columnsSet),
+        rows
+      };
+
+      return [gridPayload];
+    }
   }
 };
+
