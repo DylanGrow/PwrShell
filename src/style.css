@@ -1,10 +1,10 @@
 :root {
   --bg-page: #0a0d14;
-  --bg-card: rgba(17, 23, 36, 0.8);
-  --bg-card-border: rgba(255, 255, 255, 0.08);
+  --bg-card: rgba(17, 23, 36, 0.85);
+  --bg-card-border: rgba(255, 255, 255, 0.1);
   --bg-card-border-active: #00f0ff;
   
-  --bg-term: #080b11;
+  --bg-term: #090c13;
   --term-green: #03f200;
   --term-prompt: #03f200;
   --term-dim: #64748b;
@@ -14,9 +14,10 @@
   --accent-blue: #38bdf8;
   --accent-emerald: #10b981;
   --accent-purple: #c084fc;
-  
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, Menlo, monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* System-native fonts — zero network requests */
+  --font-mono: ui-monospace, 'Cascadia Code', 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -58,14 +59,18 @@ body {
     radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.03) 0%, transparent 40%),
     radial-gradient(circle at 0% 100%, rgba(0, 240, 255, 0.03) 0%, transparent 40%);
   background-attachment: fixed;
-  color: #f1f5f9;
+  color: #e2e8f0;
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  -webkit-font-smoothing: antialiased;
 }
 
 .cmd-page {
@@ -485,8 +490,8 @@ body {
 
 .hint-bullet {
   color: #cbd5e1;
-  font-size: 0.88rem;
-  line-height: 1.4;
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
 .term-ps-prompt {
@@ -494,7 +499,7 @@ body {
   font-size: 15px;
   line-height: 24px;
   color: #38bdf8;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -508,9 +513,9 @@ body {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--bg-card-border);
   color: #cbd5e1;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 0.25rem 0.65rem;
+  padding: 0.28rem 0.7rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: inline-flex;
@@ -523,7 +528,7 @@ body {
 .toggle-link:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .toggle-link.active {
@@ -533,11 +538,10 @@ body {
 }
 
 .ch-description {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #ffffff;
-  line-height: 1.35;
-  letter-spacing: -0.2px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.5;
   flex-shrink: 0;
 }
 
@@ -760,51 +764,53 @@ body {
 }
 
 .term-screen {
-  padding: 0.85rem 1.25rem;
+  padding: 0.85rem 1.1rem;
   flex: 1;
   min-height: 120px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.2rem;
   font-family: var(--font-mono);
   background: var(--bg-term);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .term-line {
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--term-green);
   word-break: break-word;
   white-space: pre-wrap;
 }
 
 .prompt-text {
-  color: #f1f5f9;
-  font-weight: 700;
+  color: #e2e8f0;
+  font-weight: 600;
 }
 
 .output-text {
-  color: var(--term-green);
+  color: #5ef85d;
 }
 
 .info-text {
-  color: #64748b;
-  font-size: 0.9rem;
+  color: #94a3b8;
+  font-size: 13px;
 }
 
 .error-text {
   color: var(--term-error);
   background: rgba(239, 68, 68, 0.1);
-  padding: 0.3rem 0.6rem;
+  padding: 0.25rem 0.6rem;
   border-left: 3px solid var(--term-error);
   border-radius: 2px;
 }
 
 .correct-text {
-  color: var(--term-green);
-  font-weight: 800;
-  text-shadow: 0 0 10px rgba(3, 242, 0, 0.6);
+  color: #5ef85d;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(3, 242, 0, 0.5);
 }
 
 /* Terminal Input Row */
@@ -820,10 +826,10 @@ body {
 
 .term-prompt {
   font-family: var(--font-mono);
-  font-size: 16px;
-  line-height: 24px;
-  color: var(--term-green);
-  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #5ef85d;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
@@ -844,13 +850,13 @@ body {
   pointer-events: none;
   white-space: pre;
   font-family: var(--font-mono);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 1.6;
   padding: 0;
   display: flex;
   align-items: center;
   overflow: hidden;
-  color: #ffffff;
+  color: #e2e8f0;
 }
 
 .term-input-field {
@@ -861,10 +867,10 @@ body {
   border: none;
   outline: none;
   color: transparent;
-  caret-color: var(--term-green);
+  caret-color: #5ef85d;
   font-family: var(--font-mono);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 1.6;
   padding: 0;
 }
 
