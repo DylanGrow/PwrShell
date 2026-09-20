@@ -228,9 +228,6 @@ export class CmdSite {
     const ch = this.getCurrentChallenge();
     const isSolved = this.solvedIds.has(ch.id);
     const progressPercent = Math.round((this.solvedIds.size / ChallengesCatalog.length) * 100);
-    const rank = this.getDylanRank();
-    const totalStars = this.getTotalStars();
-    const maxStars = ChallengesCatalog.length * 3;
 
     // Challenge badges with Stars
     const badgesHtml = ChallengesCatalog.map(c => {
@@ -336,47 +333,27 @@ export class CmdSite {
               <div class="logo-box">
                 <span class="logo-prompt">PS&gt;</span>
               </div>
-              <div class="brand-group">
-                <div class="brand-row">
-                  <span class="site-title">DYLAN GROW'S POWERSHELL CHALLENGE</span>
-                  <span class="bash-chip">PowerShell 7.4</span>
-                  <span class="dylan-badge">Dylan Grow</span>
-                  <span class="rank-badge" style="border-color: ${rank.color}; color: ${rank.color};">
-                    ${rank.icon} ${rank.title}
-                  </span>
-                </div>
-                <span class="site-sub">Interactive PowerShell Command Line Mastery • ${ChallengesCatalog.length} Progressive Challenges</span>
-              </div>
+              <span class="site-title">DYLAN GROW'S POWERSHELL CHALLENGE</span>
             </div>
 
             <div class="header-right">
-              <!-- Star Rating Total -->
-              <div class="stars-counter-box" title="${totalStars} of ${maxStars} possible golf stars earned">
-                <span class="stars-icon">⭐</span>
-                <span class="stars-text">${totalStars} / ${maxStars}</span>
-              </div>
-
               <div class="progress-container" title="${this.solvedIds.size} of ${ChallengesCatalog.length} completed">
                 <div class="progress-bar-bg">
                   <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
                 </div>
-                <span class="progress-label">${this.solvedIds.size} / ${ChallengesCatalog.length} (${progressPercent}%)</span>
+                <span class="progress-label">${this.solvedIds.size} / ${ChallengesCatalog.length}</span>
               </div>
-
-              <button class="nav-btn cert-nav-btn" id="btn-open-cert" title="View Dylan Grow's Official Certificate of Mastery">
-                🏆 Certificate
-              </button>
-
-              <button class="nav-btn ${this.soundEnabled ? 'active' : ''}" id="btn-toggle-sound" title="Toggle audio effects">
-                ${this.soundEnabled ? '🔊 Sound' : '🔇 Mute'}
-              </button>
 
               <button class="nav-btn" id="btn-open-catalog" title="Search all 55 challenges">
                 🔍 Catalog
               </button>
 
-              <button class="nav-btn" id="btn-reset-progress" title="Reset all progress">
-                <span class="btn-icon">↺</span> Reset
+              <button class="nav-btn icon-only" id="btn-open-cert" title="View Dylan Grow's Certificate of Mastery">
+                🏆
+              </button>
+
+              <button class="nav-btn icon-only" id="btn-reset-progress" title="Reset all progress">
+                ↺
               </button>
             </div>
           </div>
