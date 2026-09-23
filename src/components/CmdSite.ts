@@ -7,6 +7,7 @@ import { PSObject } from '../engine/psobject';
 import { SyntaxHighlighter } from './SyntaxHighlighter';
 import { GridViewModal } from './GridViewModal';
 import { CertificateModal } from './CertificateModal';
+import { CheatSheetModal } from './CheatSheetModal';
 
 export class CmdSite {
   private container: HTMLElement;
@@ -18,6 +19,7 @@ export class CmdSite {
   private personalBests: Record<number, number> = {};
   private history: string[] = [];
   private historyIndex: number = -1;
+  private fontScale: 'normal' | 'lg' | 'xl' = 'normal';
 
   // Reverse history search (Ctrl+R)
   private isReverseSearch: boolean = false;
@@ -145,6 +147,10 @@ export class CmdSite {
       if (bests) {
         this.personalBests = JSON.parse(bests);
       }
+      const fs = localStorage.getItem('ps_font_scale');
+      if (fs === 'normal' || fs === 'lg' || fs === 'xl') {
+        this.fontScale = fs;
+      }
     } catch {
       // Ignore
     }
@@ -156,9 +162,37 @@ export class CmdSite {
       localStorage.setItem('ps_cmdchallenge_current', String(this.currentId));
       localStorage.setItem('ps_cmdchallenge_sound', String(this.soundEnabled));
       localStorage.setItem('ps_cmdchallenge_bests', JSON.stringify(this.personalBests));
+      localStorage.setItem('ps_font_scale', this.fontScale);
     } catch {
       // Ignore
     }
+  }
+
+  public toggleFontScale(): void {
+    if (this.fontScale === 'normal') {
+      this.fontScale = 'lg';
+    } else if (this.fontScale === 'lg') {
+      this.fontScale = 'xl';
+    } else {
+      this.fontScale = 'normal';
+    }
+    this.saveProgress();
+    this.render();
+    this.attachEvents();
+    this.focusTerminal();
+  }
+
+  public openCheatSheet(): void {
+    const cs = new CheatSheetModal((cmd: string) => {
+      const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
+      if (input) {
+        input.value = cmd;
+        this.updateSyntaxAndCounter(cmd);
+        input.focus();
+        input.selectionStart = input.selectionEnd = cmd.length;
+      }
+    });
+    cs.show();
   }
 
   public getStarsForChallenge(chId: number): number {
@@ -325,7 +359,7 @@ export class CmdSite {
     const minSolLen = Math.min(...ch.solutions.map(s => s.length));
 
     this.container.innerHTML = `
-      <div class="cmd-page">
+      <div class="cmd-page ${this.fontScale !== 'normal' ? `font-scale-${this.fontScale}` : ''}">
         <!-- Top Navbar -->
         <header class="navbar">
           <div class="header-content">
@@ -343,6 +377,14 @@ export class CmdSite {
                 </div>
                 <span class="progress-label">${this.solvedIds.size} / ${ChallengesCatalog.length}</span>
               </div>
+
+              <button class="font-scale-btn" id="btn-toggle-font" title="Toggle Font Size: Normal (16px) ➔ Large (18px) ➔ XL (20px)">
+                Aa <span class="font-scale-badge">${this.fontScale === 'normal' ? '16px' : this.fontScale === 'lg' ? '18px' : '20px'}</span>
+              </button>
+
+              <button class="nav-btn" id="btn-open-cheatsheet" title="PowerShell Command CheatSheet & Examples (Press F1 or ?)">
+                📖 CheatSheet
+              </button>
 
               <button class="nav-btn" id="btn-open-catalog" title="Search all 55 challenges">
                 🔍 Catalog
@@ -580,6 +622,16 @@ export class CmdSite {
       if (this.currentId < ChallengesCatalog.length) this.selectChallenge(this.currentId + 1);
     });
 
+    // Font scale toggle button
+    this.container.querySelector('#btn-toggle-font')?.addEventListener('click', () => {
+      this.toggleFontScale();
+    });
+
+    // CheatSheet button
+    this.container.querySelector('#btn-open-cheatsheet')?.addEventListener('click', () => {
+      this.openCheatSheet();
+    });
+
     // Certificate button
     this.container.querySelector('#btn-open-cert')?.addEventListener('click', () => {
       const stats = {
@@ -646,13 +698,18 @@ export class CmdSite {
       });
     });
 
-    // Global keyboard shortcuts for prev/next
+    // Global keyboard shortcuts for prev/next and CheatSheet
     window.onkeydown = (e: KeyboardEvent) => {
       if (this.showCatalog && e.key === 'Escape') {
         this.showCatalog = false;
         this.render();
         this.attachEvents();
         this.focusTerminal();
+        return;
+      }
+      if (e.key === 'F1' || (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName))) {
+        e.preventDefault();
+        this.openCheatSheet();
         return;
       }
       if ((e.ctrlKey && e.key === 'ArrowLeft') || (e.key === '[' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName))) {
