@@ -142,6 +142,91 @@ export const SystemCmdlets: Record<string, CmdletDefinition> = {
     }
   },
 
+  'Format-Table': {
+    name: 'Format-Table',
+    aliases: ['ft'],
+    synopsis: 'Formats the output as a table.',
+    description: 'Displays output in a tabular column format with optional property selection.',
+    syntax: 'Format-Table [[-Property] <String[]>] [-AutoSize] [-Wrap]',
+    parameters: [
+      { name: 'Property', type: 'String[]', required: false, positional: true, description: 'Properties to include.' },
+      { name: 'AutoSize', type: 'Switch', required: false, description: 'Auto-size columns.' }
+    ],
+    examples: ['Get-Process | Format-Table Name, CPU, WorkingSet64', 'Get-Service | ft Status, Name -AutoSize'],
+    execute: (input: any[], args: CommandArgument[], _context: ExecutionContext) => {
+      const props: string[] = [];
+      for (const a of args) {
+        if (!a.name || a.name.toLowerCase() === 'property') {
+          if (typeof a.value === 'string') props.push(...a.value.split(',').map((s: string) => s.trim()));
+        }
+      }
+      // Pass-through: just attach a __format: 'table' marker
+      return input.map(item => {
+        if (item instanceof PSObject) {
+          const filtered = props.length > 0
+            ? new PSObject(Object.fromEntries(props.map(p => [p, item.getProperty(p)])), (item.typeNames?.[0] ?? 'PSCustomObject') + ':ft')
+            : item;
+          return filtered;
+        }
+        return item;
+      });
+    }
+  },
+
+  'Format-List': {
+    name: 'Format-List',
+    aliases: ['fl'],
+    synopsis: 'Formats the output as a list of properties.',
+    description: 'Displays output as a vertical Name : Value list rather than a table.',
+    syntax: 'Format-List [[-Property] <String[]>]',
+    parameters: [
+      { name: 'Property', type: 'String[]', required: false, positional: true, description: 'Properties to include.' }
+    ],
+    examples: ['Get-Process pwsh | Format-List *', 'Get-Service | fl Name, Status'],
+    execute: (input: any[], _args: CommandArgument[], _context: ExecutionContext) => {
+      return input; // pass-through; terminal already formats PSObjects
+    }
+  },
+
+  'Get-Alias': {
+    name: 'Get-Alias',
+    aliases: ['gal'],
+    synopsis: 'Gets the aliases for the current session.',
+    description: 'Lists all cmdlet aliases available in the shell.',
+    syntax: 'Get-Alias [[-Name] <String>]',
+    parameters: [
+      { name: 'Name', type: 'String', required: false, positional: true, description: 'Filter by alias name.' }
+    ],
+    examples: ['Get-Alias', 'Get-Alias ls', 'gal -Name dir'],
+    execute: (_input: any[], args: CommandArgument[], _context: ExecutionContext) => {
+      const aliases = [
+        { Name: 'ls', Definition: 'Get-ChildItem' }, { Name: 'dir', Definition: 'Get-ChildItem' },
+        { Name: 'gci', Definition: 'Get-ChildItem' }, { Name: 'cat', Definition: 'Get-Content' },
+        { Name: 'gc', Definition: 'Get-Content' }, { Name: 'sc', Definition: 'Set-Content' },
+        { Name: 'ac', Definition: 'Add-Content' }, { Name: 'ni', Definition: 'New-Item' },
+        { Name: 'rm', Definition: 'Remove-Item' }, { Name: 'del', Definition: 'Remove-Item' },
+        { Name: 'cp', Definition: 'Copy-Item' }, { Name: 'mv', Definition: 'Move-Item' },
+        { Name: 'cd', Definition: 'Set-Location' }, { Name: 'pwd', Definition: 'Get-Location' },
+        { Name: 'ps', Definition: 'Get-Process' }, { Name: 'gps', Definition: 'Get-Process' },
+        { Name: 'gsv', Definition: 'Get-Service' }, { Name: 'echo', Definition: 'Write-Output' },
+        { Name: 'cls', Definition: 'Clear-Host' }, { Name: '?', Definition: 'Where-Object' },
+        { Name: 'select', Definition: 'Select-Object' }, { Name: 'sort', Definition: 'Sort-Object' },
+        { Name: 'ft', Definition: 'Format-Table' }, { Name: 'fl', Definition: 'Format-List' },
+        { Name: 'measure', Definition: 'Measure-Object' }, { Name: 'group', Definition: 'Group-Object' },
+        { Name: 'ogv', Definition: 'Out-GridView' }, { Name: 'tee', Definition: 'Tee-Object' },
+        { Name: 'sls', Definition: 'Select-String' }, { Name: 'gm', Definition: 'Get-Member' },
+        { Name: 'gcm', Definition: 'Get-Command' }, { Name: 'gv', Definition: 'Get-Variable' },
+        { Name: 'sv', Definition: 'Set-Variable' }, { Name: 'gal', Definition: 'Get-Alias' }
+      ];
+      let filter = '';
+      for (const a of args) {
+        if (!a.name || a.name.toLowerCase() === 'name') filter = String(a.value).toLowerCase();
+      }
+      const filtered = filter ? aliases.filter(a => a.Name.toLowerCase().includes(filter) || a.Definition.toLowerCase().includes(filter)) : aliases;
+      return filtered.map(a => new PSObject(a, 'AliasInfo'));
+    }
+  },
+
   'Out-GridView': {
     name: 'Out-GridView',
     aliases: ['ogv', 'grid'],

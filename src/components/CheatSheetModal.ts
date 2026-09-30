@@ -298,10 +298,16 @@ export class CheatSheetModal {
   public show(): void {
     this.modalEl = document.createElement('div');
     this.modalEl.className = 'cheatsheet-backdrop animate-fade';
+    this.modalEl.setAttribute('role', 'dialog');
+    this.modalEl.setAttribute('aria-modal', 'true');
+    this.modalEl.setAttribute('aria-labelledby', 'cs-title');
     document.body.appendChild(this.modalEl);
 
     this.render();
     this.attachEvents();
+
+    const searchInput = this.modalEl.querySelector('#cs-search-input') as HTMLInputElement;
+    searchInput?.focus();
   }
 
   public close(): void {
@@ -343,7 +349,7 @@ export class CheatSheetModal {
     });
 
     const categoriesHtml = categories.map(cat => `
-      <button class="cs-tab-btn ${this.activeCategory === cat ? 'active' : ''}" data-cat="${cat}">
+      <button class="cs-tab-btn ${this.activeCategory === cat ? 'active' : ''}" data-cat="${cat}" role="tab" aria-selected="${this.activeCategory === cat}" aria-label="${cat === 'All' ? 'All categories' : cat + ' commands'}">
         ${cat === 'All' ? '⚡ All' : cat}
       </button>
     `).join('');
@@ -372,7 +378,7 @@ export class CheatSheetModal {
               <span class="cs-label">EXAMPLE:</span>
               <code class="cs-code-text">${this.escapeHtml(item.example)}</code>
             </div>
-            <button class="cs-try-btn" data-cmd="${this.escapeHtml(item.example)}" title="Paste into terminal">
+            <button class="cs-try-btn" data-cmd="${this.escapeHtml(item.example)}" aria-label="Paste into terminal: ${this.escapeHtml(item.example)}" title="Paste into terminal">
               Try ➔
             </button>
           </div>
@@ -384,32 +390,33 @@ export class CheatSheetModal {
       <div class="cs-modal-card animate-slide">
         <div class="cs-header">
           <div class="cs-header-left">
-            <span class="cs-header-icon">📖</span>
+            <span class="cs-header-icon" aria-hidden="true">📖</span>
             <div>
-              <div class="cs-title">PowerShell Command CheatSheet</div>
+              <h2 class="cs-title" id="cs-title">PowerShell Command CheatSheet</h2>
               <div class="cs-subtitle">Quick reference guide &amp; examples curated for Dylan Grow • Press <strong>F1</strong> or <strong>?</strong> anytime</div>
             </div>
           </div>
-          <button class="cs-close-btn" id="btn-cs-close" title="Close CheatSheet (Esc)">✕</button>
+          <button class="cs-close-btn" id="btn-cs-close" aria-label="Close CheatSheet" title="Close CheatSheet (Esc)">✕</button>
         </div>
 
         <div class="cs-controls-row">
           <div class="cs-search-wrap">
-            <span class="cs-search-icon">🔍</span>
+            <span class="cs-search-icon" aria-hidden="true">🔍</span>
             <input
               type="text"
               id="cs-search-input"
               class="cs-search-input"
               placeholder="Filter cmdlets, aliases, syntax (e.g. 'Out-GridView', 'sort', 'regex')..."
+              aria-label="Filter cmdlets, aliases, and syntax"
               value="${this.escapeHtml(this.searchQuery)}"
             />
           </div>
-          <div class="cs-tabs-strip">
+          <div class="cs-tabs-strip" role="tablist" aria-label="Command categories">
             ${categoriesHtml}
           </div>
         </div>
 
-        <div class="cs-list-scroll">
+        <div class="cs-list-scroll" role="region" aria-label="Matching cmdlets">
           ${itemsHtml.length > 0 
             ? itemsHtml 
             : `<div class="cs-empty">No cmdlets found matching "${this.escapeHtml(this.searchQuery)}".</div>`}
@@ -438,11 +445,27 @@ export class CheatSheetModal {
       }
     });
 
-    // Esc key
+    // Esc key & Focus Trap
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         this.close();
         window.removeEventListener('keydown', onKeyDown);
+        return;
+      }
+      if (e.key === 'Tab' && this.modalEl) {
+        const focusables = Array.from(this.modalEl.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])'));
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);

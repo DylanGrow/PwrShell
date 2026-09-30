@@ -23,9 +23,15 @@ export class GridViewModal {
   public show(): void {
     this.modalEl = document.createElement('div');
     this.modalEl.className = 'gridview-backdrop animate-fade';
+    this.modalEl.setAttribute('role', 'dialog');
+    this.modalEl.setAttribute('aria-modal', 'true');
+    this.modalEl.setAttribute('aria-labelledby', 'gv-modal-title');
     document.body.appendChild(this.modalEl);
 
     this.render();
+
+    const input = this.modalEl.querySelector('#gv-filter-input') as HTMLInputElement;
+    input?.focus();
   }
 
   public close(): void {
@@ -88,14 +94,16 @@ export class GridViewModal {
     // Headers
     const headersHtml = this.data.columns.map(col => {
       let icon = '';
+      let sortState = 'none';
       if (this.sortColumn === col) {
         icon = this.sortAsc ? ' ▲' : ' ▼';
+        sortState = this.sortAsc ? 'ascending' : 'descending';
       }
       return `
-        <th class="gv-th" data-col="${this.escapeHtml(col)}">
+        <th class="gv-th" data-col="${this.escapeHtml(col)}" tabindex="0" role="columnheader" aria-sort="${sortState}" aria-label="Sort by ${this.escapeHtml(col)}">
           <div class="gv-th-inner">
             <span>${this.escapeHtml(col)}</span>
-            <span class="gv-sort-icon">${icon}</span>
+            <span class="gv-sort-icon" aria-hidden="true">${icon}</span>
           </div>
         </th>
       `;
@@ -121,32 +129,33 @@ export class GridViewModal {
         <!-- Title bar -->
         <div class="gv-titlebar">
           <div class="gv-title-left">
-            <span class="gv-icon">📊</span>
-            <span class="gv-title-text">${this.escapeHtml(this.data.title)} [PowerShell Grid View]</span>
+            <span class="gv-icon" aria-hidden="true">📊</span>
+            <h2 class="gv-title-text" id="gv-modal-title">${this.escapeHtml(this.data.title)} [PowerShell Grid View]</h2>
           </div>
           <div class="gv-controls">
-            <button class="gv-btn-close" id="btn-gv-x">✕</button>
+            <button class="gv-btn-close" id="btn-gv-x" aria-label="Close Grid View" title="Close (Esc)">✕</button>
           </div>
         </div>
 
         <!-- Filter Bar -->
         <div class="gv-toolbar">
           <div class="gv-filter-wrap">
-            <span class="gv-search-icon">🔍</span>
+            <span class="gv-search-icon" aria-hidden="true">🔍</span>
             <input
               type="text"
               id="gv-filter-input"
               class="gv-filter-input"
               placeholder="Filter items across all columns (e.g. 'chrome', 'Engineering')..."
+              aria-label="Filter grid rows across all columns"
               value="${this.escapeHtml(this.filterQuery)}"
             />
-            ${this.filterQuery ? `<button class="gv-btn-clear" id="btn-gv-clear">✕</button>` : ''}
+            ${this.filterQuery ? `<button class="gv-btn-clear" id="btn-gv-clear" aria-label="Clear filter">✕</button>` : ''}
           </div>
         </div>
 
         <!-- Table Container -->
         <div class="gv-table-scroll">
-          <table class="gv-table">
+          <table class="gv-table" role="grid" aria-label="${this.escapeHtml(this.data.title)} data grid">
             <thead>
               <tr>${headersHtml}</tr>
             </thead>
@@ -160,7 +169,7 @@ export class GridViewModal {
         <div class="gv-statusbar">
           <span>Showing ${this.currentRows.length} of ${this.data.rows.length} items</span>
           <div class="gv-status-right">
-            <button class="gv-btn-action" id="btn-gv-ok">OK</button>
+            <button class="gv-btn-action" id="btn-gv-ok" aria-label="Confirm selection and close">OK</button>
           </div>
         </div>
       </div>
@@ -183,11 +192,27 @@ export class GridViewModal {
       }
     });
 
-    // Escape key
+    // Escape key & Focus Trap
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         window.removeEventListener('keydown', onKey);
         this.close();
+        return;
+      }
+      if (e.key === 'Tab' && this.modalEl) {
+        const focusables = Array.from(this.modalEl.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), th[tabindex="0"]'));
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -212,10 +237,10 @@ export class GridViewModal {
       this.render();
     });
 
-    // Column sorting
+    // Column sorting (click + keyboard)
     this.modalEl.querySelectorAll('.gv-th').forEach(th => {
-      th.addEventListener('click', (e) => {
-        const col = (e.currentTarget as HTMLElement).getAttribute('data-col');
+      const toggleSort = () => {
+        const col = (th as HTMLElement).getAttribute('data-col');
         if (!col) return;
 
         if (this.sortColumn === col) {
@@ -225,6 +250,15 @@ export class GridViewModal {
           this.sortAsc = true;
         }
         this.render();
+      };
+
+      th.addEventListener('click', toggleSort);
+      th.addEventListener('keydown', (e: Event) => {
+        const ke = e as KeyboardEvent;
+        if (ke.key === 'Enter' || ke.key === ' ') {
+          ke.preventDefault();
+          toggleSort();
+        }
       });
     });
 

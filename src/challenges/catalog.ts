@@ -1181,5 +1181,396 @@ export const ChallengesCatalog: CmdChallenge[] = [
     verify: (_vfs, output, _cmd) => {
       return output.some(o => String(o).toLowerCase().includes('dylan grow') && String(o).toLowerCase().includes('master'));
     }
+  },
+  {
+    id: 56,
+    slug: 'rename_file',
+    title: 'Rename a File',
+    category: 'Filesystem',
+    difficulty: 'Easy',
+    prompt: "Rename 'notes.txt' to 'notes_backup.txt' using Rename-Item.",
+    syntaxTip: "Rename-Item notes.txt notes_backup.txt",
+    hints: [
+      "Run: Rename-Item notes.txt notes_backup.txt",
+      "Aliases: ren notes.txt notes_backup.txt",
+      "Use -Path and -NewName: Rename-Item -Path notes.txt -NewName notes_backup.txt"
+    ],
+    solutions: [
+      'Rename-Item notes.txt notes_backup.txt',
+      'Rename-Item -Path notes.txt -NewName notes_backup.txt',
+      'ren notes.txt notes_backup.txt'
+    ],
+    verify: (vfs, _output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      if (!(lower.includes('rename-item') || lower.startsWith('ren '))) return false;
+      return vfs.fileExists('notes_backup.txt') && !vfs.fileExists('notes.txt');
+    }
+  },
+  {
+    id: 57,
+    slug: 'move_file_to_backup',
+    title: 'Move File to Backup',
+    category: 'Filesystem',
+    difficulty: 'Easy',
+    prompt: "Move 'config.json' into the 'backup' folder using Move-Item.",
+    syntaxTip: "Move-Item config.json backup/",
+    hints: [
+      "Run: Move-Item config.json backup/",
+      "Or: mv config.json backup/",
+      "Or specify full: Move-Item -Path config.json -Destination backup/"
+    ],
+    solutions: [
+      'Move-Item config.json backup/',
+      'Move-Item -Path config.json -Destination backup/',
+      'mv config.json backup/'
+    ],
+    verify: (vfs, _output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      if (!(lower.includes('move-item') || lower.startsWith('mv '))) return false;
+      return vfs.fileExists('backup\\config.json') || vfs.fileExists('backup/config.json');
+    }
+  },
+  {
+    id: 58,
+    slug: 'format_table_output',
+    title: 'Format Output as Table',
+    category: 'Processes & Admin',
+    difficulty: 'Easy',
+    prompt: "List all processes formatted as a table showing only Name and CPU columns.",
+    syntaxTip: "Get-Process | Format-Table Name, CPU",
+    hints: [
+      "Run: Get-Process | Format-Table Name, CPU",
+      "Or use alias: ps | ft Name, CPU",
+      "Format-Table is aliased to 'ft'"
+    ],
+    solutions: [
+      'Get-Process | Format-Table Name, CPU',
+      'Get-Process | ft Name, CPU',
+      'ps | Format-Table Name, CPU',
+      'ps | ft Name, CPU'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-process') || lower.includes(' ps') || lower.startsWith('ps')) &&
+             (lower.includes('format-table') || lower.includes(' ft ') || lower.endsWith(' ft')) &&
+             output.length > 0;
+    }
+  },
+  {
+    id: 59,
+    slug: 'list_all_aliases',
+    title: 'List All Aliases',
+    category: 'Basics',
+    difficulty: 'Easy',
+    prompt: "Display all available PowerShell aliases in the current session.",
+    syntaxTip: "Get-Alias",
+    hints: [
+      "Run: Get-Alias",
+      "Or use the alias for Get-Alias: gal",
+      "Pipe to select for just Name + Definition: Get-Alias | select Name, Definition"
+    ],
+    solutions: [
+      'Get-Alias',
+      'gal',
+      'Get-Alias | select Name, Definition'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-alias') || lower === 'gal' || lower.startsWith('gal ')) && output.length > 5;
+    }
+  },
+  {
+    id: 60,
+    slug: 'inspect_object_members',
+    title: 'Inspect Object Properties',
+    category: 'Objects & JSON',
+    difficulty: 'Easy',
+    prompt: "Use Get-Member (gm) to inspect the properties of Get-Process output.",
+    syntaxTip: "Get-Process | Get-Member",
+    hints: [
+      "Run: Get-Process | Get-Member",
+      "Or alias: ps | gm",
+      "Get-Member shows all properties and methods on objects"
+    ],
+    solutions: [
+      'Get-Process | Get-Member',
+      'Get-Process | gm',
+      'ps | Get-Member',
+      'ps | gm'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-member') || lower.includes(' gm')) && output.length > 2;
+    }
+  },
+  {
+    id: 61,
+    slug: 'append_content',
+    title: 'Append Text to File',
+    category: 'Filesystem',
+    difficulty: 'Easy',
+    prompt: "Append the text 'PowerShell is awesome' to notes.txt without overwriting it.",
+    syntaxTip: "Add-Content notes.txt 'PowerShell is awesome'",
+    hints: [
+      "Use Add-Content: Add-Content notes.txt 'PowerShell is awesome'",
+      "Or alias: ac notes.txt 'PowerShell is awesome'",
+      "Add-Content appends — it does not overwrite like Set-Content"
+    ],
+    solutions: [
+      "Add-Content notes.txt 'PowerShell is awesome'",
+      "Add-Content -Path notes.txt -Value 'PowerShell is awesome'",
+      "ac notes.txt 'PowerShell is awesome'"
+    ],
+    verify: (vfs, _output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      if (!(lower.includes('add-content') || lower.startsWith('ac '))) return false;
+      const content = vfs.readFile('notes.txt');
+      return content !== null && content.toLowerCase().includes('powershell is awesome');
+    }
+  },
+  {
+    id: 62,
+    slug: 'set_variable',
+    title: 'Store Value in Variable',
+    category: 'Basics',
+    difficulty: 'Easy',
+    prompt: "Create a variable called 'Score' with the value 100, then output it.",
+    syntaxTip: "$Score = 100; $Score",
+    hints: [
+      "Assign: $Score = 100",
+      "Then output: $Score",
+      "Or in one line: $Score = 100; $Score"
+    ],
+    solutions: [
+      '$Score = 100; $Score',
+      'Set-Variable -Name Score -Value 100; $Score',
+      '$Score = 100\n$Score'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('$score') || lower.includes('set-variable')) &&
+             output.some(o => String(o) === '100' || Number(o) === 100);
+    }
+  },
+  {
+    id: 63,
+    slug: 'foreach_loop',
+    title: 'ForEach-Object Loop',
+    category: 'Pipelines',
+    difficulty: 'Medium',
+    prompt: "Use ForEach-Object to print each line of names.txt in uppercase.",
+    syntaxTip: "Get-Content names.txt | ForEach-Object { $_.ToUpper() }",
+    hints: [
+      "Read the file: Get-Content names.txt",
+      "Pipe to ForEach-Object (alias: %): | ForEach-Object { $_.ToUpper() }",
+      "Or shorter: gc names.txt | % { $_.ToUpper() }"
+    ],
+    solutions: [
+      'Get-Content names.txt | ForEach-Object { $_.ToUpper() }',
+      'gc names.txt | ForEach-Object { $_.ToUpper() }',
+      "Get-Content names.txt | % { $_.ToUpper() }",
+      "gc names.txt | % { $_.ToUpper() }"
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-content') || lower.startsWith('gc ')) &&
+             (lower.includes('foreach-object') || lower.includes('% {') || lower.includes('%{')) &&
+             lower.includes('toupper') &&
+             output.length > 0 &&
+             output.some(o => String(o) === String(o).toUpperCase() && String(o).length > 2);
+    }
+  },
+  {
+    id: 64,
+    slug: 'convert_to_json',
+    title: 'Export Objects to JSON',
+    category: 'Objects & JSON',
+    difficulty: 'Medium',
+    prompt: "Convert the top 2 processes (by name) to JSON format using ConvertTo-Json.",
+    syntaxTip: "Get-Process | Select-Object -First 2 | ConvertTo-Json",
+    hints: [
+      "Get processes: Get-Process",
+      "Select first 2: | Select-Object -First 2  (or | select -First 2)",
+      "Convert: | ConvertTo-Json"
+    ],
+    solutions: [
+      'Get-Process | Select-Object -First 2 | ConvertTo-Json',
+      'Get-Process | select -First 2 | ConvertTo-Json',
+      'ps | select -First 2 | ConvertTo-Json'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-process') || lower.startsWith('ps')) &&
+             lower.includes('convertto-json') &&
+             output.length > 0 &&
+             typeof output[0] === 'string' &&
+             (output[0].includes('[') || output[0].includes('{'));
+    }
+  },
+  {
+    id: 65,
+    slug: 'get_stopped_services',
+    title: 'Find Stopped Services',
+    category: 'Processes & Admin',
+    difficulty: 'Easy',
+    prompt: "List only the services that are currently Stopped using Where-Object.",
+    syntaxTip: "Get-Service | Where-Object Status -eq 'Stopped'",
+    hints: [
+      "Run: Get-Service | Where-Object Status -eq 'Stopped'",
+      "Or shorthand: gsv | ? Status -eq 'Stopped'",
+      "'-eq' means 'equals' in PowerShell comparisons"
+    ],
+    solutions: [
+      "Get-Service | Where-Object Status -eq 'Stopped'",
+      "Get-Service | ? Status -eq 'Stopped'",
+      "gsv | Where-Object Status -eq 'Stopped'",
+      "gsv | ? Status -eq 'Stopped'"
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-service') || lower.includes('gsv')) &&
+             (lower.includes('where-object') || lower.includes('? ') || lower.includes(' ?')) &&
+             lower.includes('stopped') &&
+             output.length > 0 &&
+             output.length < 6 &&
+             output.every(o => o instanceof PSObject && String(o.getProperty('Status')) === 'Stopped');
+    }
+  },
+  {
+    id: 66,
+    slug: 'count_file_lines',
+    title: 'Count Lines in a File',
+    category: 'Text & Search',
+    difficulty: 'Easy',
+    prompt: "Count how many lines are in access.log using Measure-Object.",
+    syntaxTip: "Get-Content access.log | Measure-Object -Line",
+    hints: [
+      "Read the file: Get-Content access.log",
+      "Count lines: | Measure-Object -Line",
+      "Or use alias: gc access.log | measure -Line"
+    ],
+    solutions: [
+      'Get-Content access.log | Measure-Object -Line',
+      'Get-Content access.log | Measure-Object',
+      'gc access.log | Measure-Object -Line',
+      'gc access.log | measure -Line'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-content') || lower.startsWith('gc ')) &&
+             lower.includes('access.log') &&
+             (lower.includes('measure-object') || lower.includes('measure')) &&
+             output.length > 0 &&
+             output.some(o => o instanceof PSObject && Number(o.getProperty('Lines')) > 0);
+    }
+  },
+  {
+    id: 67,
+    slug: 'top_memory_processes',
+    title: 'Top 3 Memory Consumers',
+    category: 'Processes & Admin',
+    difficulty: 'Medium',
+    prompt: "Find the top 3 processes consuming the most memory (WorkingSet64), sorted descending.",
+    syntaxTip: "Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 3",
+    hints: [
+      "Get processes: Get-Process",
+      "Sort by memory: | Sort-Object WorkingSet64 -Descending",
+      "Take top 3: | Select-Object -First 3"
+    ],
+    solutions: [
+      'Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 3',
+      'Get-Process | Sort-Object WorkingSet64 -Descending | select -First 3',
+      'ps | sort WorkingSet64 -Descending | select -First 3',
+      'ps | Sort-Object WorkingSet64 -Descending | Select-Object -First 3'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('get-process') || lower.startsWith('ps')) &&
+             lower.includes('workingset64') &&
+             (lower.includes('sort-object') || lower.includes('sort ')) &&
+             lower.includes('descending') &&
+             output.length === 3;
+    }
+  },
+  {
+    id: 68,
+    slug: 'unique_departments',
+    title: 'List Unique Departments',
+    category: 'Objects & JSON',
+    difficulty: 'Medium',
+    prompt: "Import employees.csv and list all unique department names using Select-Object -Unique.",
+    syntaxTip: "Import-Csv employees.csv | Select-Object -ExpandProperty Department -Unique",
+    hints: [
+      "Import: Import-Csv employees.csv",
+      "Extract + deduplicate: | Select-Object -ExpandProperty Department -Unique",
+      "Or: | select -ExpandProperty Department -Unique"
+    ],
+    solutions: [
+      'Import-Csv employees.csv | Select-Object -ExpandProperty Department -Unique',
+      'Import-Csv employees.csv | select -ExpandProperty Department -Unique',
+      'ipcsv employees.csv | Select-Object -ExpandProperty Department -Unique'
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return lower.includes('employees.csv') &&
+             lower.includes('department') &&
+             lower.includes('unique') &&
+             output.length >= 4 && output.length <= 6;
+    }
+  },
+  {
+    id: 69,
+    slug: 'search_log_pattern',
+    title: 'Search Log for 404 Errors',
+    category: 'Text & Search',
+    difficulty: 'Medium',
+    prompt: "Search access.log for all lines containing '404' using Select-String.",
+    syntaxTip: "Select-String -Pattern '404' -Path access.log",
+    hints: [
+      "Run: Select-String '404' access.log",
+      "Or with named params: Select-String -Pattern '404' -Path access.log",
+      "Alias: sls '404' access.log"
+    ],
+    solutions: [
+      "Select-String -Pattern '404' -Path access.log",
+      "Select-String '404' access.log",
+      "sls '404' access.log",
+      "Get-Content access.log | Select-String '404'"
+    ],
+    verify: (_vfs, output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return (lower.includes('select-string') || lower.startsWith('sls ')) &&
+             lower.includes('404') &&
+             lower.includes('access.log') &&
+             output.length > 0;
+    }
+  },
+  {
+    id: 70,
+    slug: 'export_engineers_csv',
+    title: 'Export Engineering Team to CSV',
+    category: 'Objects & JSON',
+    difficulty: 'Hard',
+    prompt: "From employees.csv, filter only Engineering department employees and export to 'engineers.csv'.",
+    syntaxTip: "Import-Csv employees.csv | Where-Object Department -eq 'Engineering' | Export-Csv engineers.csv -NoTypeInformation",
+    hints: [
+      "Import: Import-Csv employees.csv",
+      "Filter: | Where-Object Department -eq 'Engineering'",
+      "Export: | Export-Csv engineers.csv -NoTypeInformation"
+    ],
+    solutions: [
+      "Import-Csv employees.csv | Where-Object Department -eq 'Engineering' | Export-Csv engineers.csv -NoTypeInformation",
+      "Import-Csv employees.csv | ? Department -eq 'Engineering' | Export-Csv engineers.csv -NoTypeInformation",
+      "ipcsv employees.csv | ? Department -eq 'Engineering' | epcsv engineers.csv -NoTypeInformation"
+    ],
+    verify: (vfs, _output, cmd) => {
+      const lower = cmd.toLowerCase().trim();
+      return lower.includes('employees.csv') &&
+             (lower.includes('where-object') || lower.includes('? ')) &&
+             lower.includes('engineering') &&
+             (lower.includes('export-csv') || lower.includes('epcsv')) &&
+             lower.includes('engineers.csv') &&
+             vfs.fileExists('engineers.csv');
+    }
   }
 ];

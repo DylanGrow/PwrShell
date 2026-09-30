@@ -12,8 +12,11 @@ export class CertificateModal {
   private certId: string;
   private issueDate: string;
 
-  constructor(stats: CertificateStats) {
+  private onClose?: () => void;
+
+  constructor(stats: CertificateStats, onClose?: () => void) {
     this.stats = stats;
+    this.onClose = onClose;
     // Generate deterministic certificate ID based on date and name
     const year = new Date().getFullYear();
     const hash = Math.abs(this.simpleHash(`DylanGrow-${stats.solvedCount}-${year}`)).toString(16).toUpperCase().padStart(6, '0');
@@ -37,16 +40,25 @@ export class CertificateModal {
   public show(): void {
     this.modalEl = document.createElement('div');
     this.modalEl.className = 'cert-backdrop animate-fade';
+    this.modalEl.setAttribute('role', 'dialog');
+    this.modalEl.setAttribute('aria-modal', 'true');
+    this.modalEl.setAttribute('aria-labelledby', 'cert-dialog-title');
     document.body.appendChild(this.modalEl);
 
     this.render();
     this.attachEvents();
+
+    const closeBtn = this.modalEl.querySelector('#btn-cert-x') as HTMLElement;
+    closeBtn?.focus();
   }
 
   public close(): void {
     if (this.modalEl && this.modalEl.parentNode) {
       this.modalEl.parentNode.removeChild(this.modalEl);
       this.modalEl = null;
+    }
+    if (this.onClose) {
+      this.onClose();
     }
   }
 
@@ -60,10 +72,10 @@ export class CertificateModal {
         <!-- Top controls -->
         <div class="cert-top-bar">
           <div class="cert-top-title">
-            <span>🏆</span>
-            <strong>Official Certification of Competency</strong>
+            <span aria-hidden="true">🏆</span>
+            <strong id="cert-dialog-title">Official Certification of Competency</strong>
           </div>
-          <button class="cert-close-btn" id="btn-cert-x">✕</button>
+          <button class="cert-close-btn" id="btn-cert-x" aria-label="Close Certificate" title="Close (Esc)">✕</button>
         </div>
 
         <!-- The Certificate Document -->
@@ -134,11 +146,11 @@ export class CertificateModal {
 
         <!-- Action Bar -->
         <div class="cert-actions-bar">
-          <button class="cert-btn-primary" id="btn-cert-print">
-            <span>🖨️</span> Print / Save as PDF
+          <button class="cert-btn-primary" id="btn-cert-print" aria-label="Print Certificate or save as PDF">
+            <span aria-hidden="true">🖨️</span> Print / Save as PDF
           </button>
-          <button class="cert-btn-secondary" id="btn-cert-share">
-            <span>📋</span> Copy Achievement Text
+          <button class="cert-btn-secondary" id="btn-cert-share" aria-label="Copy achievement text to clipboard">
+            <span aria-hidden="true">📋</span> Copy Achievement Text
           </button>
         </div>
       </div>
@@ -160,9 +172,9 @@ export class CertificateModal {
       const shareText = `🏆 Dylan Grow achieved the rank of ${this.stats.rankTitle} in PowerShell Command Challenge (${this.stats.solvedCount}/${this.stats.totalCount} challenges solved, ${this.stats.totalStars} ⭐)! Check it out: https://dylangrow.github.io/PwrShell/`;
       navigator.clipboard?.writeText(shareText);
       const btn = e.currentTarget as HTMLElement;
-      btn.innerHTML = `<span>✓</span> Copied to Clipboard!`;
+      btn.innerHTML = `<span aria-hidden="true">✓</span> Copied to Clipboard!`;
       setTimeout(() => {
-        btn.innerHTML = `<span>📋</span> Copy Achievement Text`;
+        btn.innerHTML = `<span aria-hidden="true">📋</span> Copy Achievement Text`;
       }, 2000);
     });
 
@@ -173,11 +185,27 @@ export class CertificateModal {
       }
     });
 
-    // Escape key
+    // Focus trap & Escape key
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         window.removeEventListener('keydown', onKey);
         this.close();
+        return;
+      }
+      if (e.key === 'Tab' && this.modalEl) {
+        const focusables = Array.from(this.modalEl.querySelectorAll<HTMLElement>('button:not([disabled])'));
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
     window.addEventListener('keydown', onKey);

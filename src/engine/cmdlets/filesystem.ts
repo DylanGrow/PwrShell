@@ -512,5 +512,73 @@ export const FilesystemCmdlets = (vfs: VirtualFileSystem): Record<string, Cmdlet
       }
       return [];
     }
+  },
+
+  'Rename-Item': {
+    name: 'Rename-Item',
+    aliases: ['ren', 'rni'],
+    synopsis: 'Renames an item in a PowerShell provider namespace.',
+    description: 'Renames a file or directory to a new name.',
+    syntax: 'Rename-Item [-Path] <String> [-NewName] <String>',
+    parameters: [
+      { name: 'Path', type: 'String', required: true, positional: true, description: 'Current file name or path.' },
+      { name: 'NewName', type: 'String', required: true, positional: true, description: 'New name for the item.' }
+    ],
+    examples: ['Rename-Item notes.txt notes_backup.txt', 'ren welcome.txt welcome_old.txt'],
+    execute: (_input: any[], args: CommandArgument[], context: ExecutionContext) => {
+      let oldPath = '';
+      let newName = '';
+      for (const a of args) {
+        const n = a.name?.toLowerCase();
+        if (!n && !oldPath) oldPath = String(a.value);
+        else if (!n && !newName) newName = String(a.value);
+        else if (n === 'path') oldPath = String(a.value);
+        else if (n === 'newname') newName = String(a.value);
+      }
+      if (!oldPath || !newName) { context.writeOutput('Rename-Item: -Path and -NewName are required.', 'error'); return []; }
+      const content = vfs.readFile(oldPath);
+      if (content === null) { context.writeOutput(`Rename-Item: Cannot find path '${oldPath}'.`, 'error'); return []; }
+      const parentDir = oldPath.includes('\\') ? oldPath.substring(0, oldPath.lastIndexOf('\\') + 1) : '';
+      vfs.writeFile(parentDir + newName, content);
+      vfs.deleteFile(oldPath);
+      return [];
+    }
+  },
+
+  'Move-Item': {
+    name: 'Move-Item',
+    aliases: ['mv', 'move', 'mi'],
+    synopsis: 'Moves an item from one location to another.',
+    description: 'Moves files and folders to a new location.',
+    syntax: 'Move-Item [-Path] <String> [-Destination] <String>',
+    parameters: [
+      { name: 'Path', type: 'String', required: true, positional: true, description: 'Source path.' },
+      { name: 'Destination', type: 'String', required: true, positional: true, description: 'Destination path.' }
+    ],
+    examples: ['Move-Item notes.txt backup/', 'mv config.json backup/config.json', 'mi welcome.txt backup/welcome.txt'],
+    execute: (_input: any[], args: CommandArgument[], context: ExecutionContext) => {
+      let src = '';
+      let dest = '';
+      for (const a of args) {
+        const n = a.name?.toLowerCase();
+        if (!n && !src) src = String(a.value);
+        else if (!n && !dest) dest = String(a.value);
+        else if (n === 'path') src = String(a.value);
+        else if (n === 'destination' || n === 'dest') dest = String(a.value);
+      }
+      if (!src || !dest) { context.writeOutput('Move-Item: -Path and -Destination are required.', 'error'); return []; }
+      const content = vfs.readFile(src);
+      if (content === null) { context.writeOutput(`Move-Item: Cannot find path '${src}'.`, 'error'); return []; }
+      let destPath = dest;
+      // If dest looks like a directory name (no extension), put file inside it
+      if (!dest.includes('.') && (dest.toLowerCase().includes('backup') || dest.endsWith('/') || dest.endsWith('\\'))) {
+        const fileName = src.split('\\').pop()?.split('/').pop() || 'file';
+        const cleanDest = dest.replace(/[/\\]+$/, '');
+        destPath = `${cleanDest}\\${fileName}`;
+      }
+      vfs.writeFile(destPath, content);
+      vfs.deleteFile(src);
+      return [];
+    }
   }
 });

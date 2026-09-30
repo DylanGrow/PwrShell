@@ -8,6 +8,7 @@ import { SyntaxHighlighter } from './SyntaxHighlighter';
 import { GridViewModal } from './GridViewModal';
 import { CertificateModal } from './CertificateModal';
 import { CheatSheetModal } from './CheatSheetModal';
+import { StatsModal } from './StatsModal';
 
 export class CmdSite {
   private container: HTMLElement;
@@ -33,8 +34,8 @@ export class CmdSite {
   private showCatalog: boolean = false;
   private catalogSearchQuery: string = '';
   private soundEnabled: boolean = true;
-
   private audioCtx: AudioContext | null = null;
+  private lastFocusedElement: HTMLElement | null = null;
 
   private autocompleteList: string[] = [
     'Get-ChildItem', 'Get-Content', 'Set-Content', 'Add-Content', 'New-Item', 'Remove-Item', 'Copy-Item',
@@ -183,15 +184,21 @@ export class CmdSite {
   }
 
   public openCheatSheet(): void {
-    const cs = new CheatSheetModal((cmd: string) => {
-      const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
-      if (input) {
-        input.value = cmd;
-        this.updateSyntaxAndCounter(cmd);
-        input.focus();
-        input.selectionStart = input.selectionEnd = cmd.length;
+    this.lastFocusedElement = document.activeElement as HTMLElement;
+    const cs = new CheatSheetModal(
+      (cmd: string) => {
+        const input = this.container.querySelector('#cmd-term-input') as HTMLInputElement;
+        if (input) {
+          input.value = cmd;
+          this.updateSyntaxAndCounter(cmd);
+          input.focus();
+          input.selectionStart = input.selectionEnd = cmd.length;
+        }
+      },
+      () => {
+        this.lastFocusedElement?.focus();
       }
-    });
+    );
     cs.show();
   }
 
@@ -221,11 +228,29 @@ export class CmdSite {
 
   private getDylanRank(): { title: string; color: string; icon: string } {
     const count = this.solvedIds.size;
-    if (count >= 55) return { title: 'Grandmaster of PowerShell', color: '#f59e0b', icon: '👑' };
+    if (count >= 70) return { title: 'Grandmaster of PowerShell', color: '#f59e0b', icon: '👑' };
+    if (count >= 55) return { title: 'PowerShell Architect', color: '#f97316', icon: '🏆' };
     if (count >= 40) return { title: 'DevOps Engineer', color: '#38bdf8', icon: '🚀' };
     if (count >= 25) return { title: 'SysAdmin Specialist', color: '#a855f7', icon: '⚡' };
     if (count >= 10) return { title: 'Pipeline Apprentice', color: '#10b981', icon: '🛠️' };
     return { title: 'PowerShell Explorer', color: '#94a3b8', icon: '🌱' };
+  }
+
+  public openStats(): void {
+    this.lastFocusedElement = document.activeElement as HTMLElement;
+    const modal = new StatsModal(
+      {
+        solvedIds: this.solvedIds,
+        personalBests: this.personalBests,
+        getStars: (id: number) => this.getStarsForChallenge(id),
+        getTotalStars: () => this.getTotalStars(),
+        getDylanRank: () => this.getDylanRank()
+      },
+      () => {
+        this.lastFocusedElement?.focus();
+      }
+    );
+    modal.show();
   }
 
   private getCurrentChallenge(): CmdChallenge {
@@ -245,6 +270,18 @@ export class CmdSite {
     this.render();
     this.attachEvents();
     this.focusTerminal();
+    const ch = this.getCurrentChallenge();
+    this.announce(`Loaded challenge ${ch.id} of ${ChallengesCatalog.length}: ${ch.title}. ${ch.prompt}`);
+  }
+
+  private announce(msg: string): void {
+    const el = this.container.querySelector('#a11y-announcer');
+    if (el) {
+      el.textContent = '';
+      setTimeout(() => {
+        el.textContent = msg;
+      }, 50);
+    }
   }
 
   public nextChallenge(): void {
@@ -277,12 +314,14 @@ export class CmdSite {
       else if (stars === 2) starIcons = '⭐⭐';
       else if (stars === 1) starIcons = '⭐';
 
+      const accessibleLabel = `Challenge ${c.id}: ${this.escapeHtml(c.title)} (${c.difficulty})${isDone ? ', Solved' : ''}${stars > 0 ? `, ${stars} stars` : ''}`;
+
       return `
-        <button class="${cls}" data-id="${c.id}" title="${c.id}. ${c.title} (${c.difficulty}) ${starIcons}">
-          ${isDone ? '<span class="ch-check">✓</span>' : ''}
+        <button class="${cls}" data-id="${c.id}" role="tab" aria-selected="${isCur}" aria-controls="main-challenge" aria-label="${accessibleLabel}" title="${c.id}. ${c.title} (${c.difficulty}) ${starIcons}">
+          ${isDone ? '<span class="ch-check" aria-hidden="true">✓</span>' : ''}
           <span class="badge-num">${c.id}</span>
           <span class="badge-slug">${c.slug}</span>
-          ${stars > 0 ? `<span class="badge-stars">${'★'.repeat(stars)}</span>` : ''}
+          ${stars > 0 ? `<span class="badge-stars" aria-hidden="true">${'★'.repeat(stars)}</span>` : ''}
         </button>
       `;
     }).join('');
@@ -291,11 +330,11 @@ export class CmdSite {
     const solutionsHtml = ch.solutions.map(s => `
       <div class="sol-item">
         <div class="sol-code-wrap">
-          <span class="sol-dollar">PS&gt;</span>
+          <span class="sol-dollar" aria-hidden="true">PS&gt;</span>
           <code>${this.escapeHtml(s)}</code>
           <span class="sol-char-len">[${s.length} chars]</span>
         </div>
-        <button class="btn-try-sol" data-cmd="${this.escapeHtml(s)}">Run ➔</button>
+        <button class="btn-try-sol" data-cmd="${this.escapeHtml(s)}" aria-label="Run solution: ${this.escapeHtml(s)}">Run ➔</button>
       </div>
     `).join('');
 
@@ -322,7 +361,7 @@ export class CmdSite {
           <span class="vfs-file-name">📄 ${f.name}</span>
           <span class="vfs-file-desc">${f.desc}</span>
         </div>
-        <button class="btn-view-file" data-file="${f.name}">View ➔</button>
+        <button class="btn-view-file" data-file="${f.name}" aria-label="View file ${f.name}">View ➔</button>
       </div>
     `).join('');
 
@@ -341,16 +380,16 @@ export class CmdSite {
       const isDone = this.solvedIds.has(c.id);
       const stars = this.getStarsForChallenge(c.id);
       return `
-        <div class="catalog-item ${c.id === this.currentId ? 'current' : ''}" data-id="${c.id}">
+        <button type="button" class="catalog-item ${c.id === this.currentId ? 'current' : ''}" data-id="${c.id}" role="option" aria-selected="${c.id === this.currentId}" aria-label="Challenge #${c.id}: ${this.escapeHtml(c.title)} (${c.difficulty})${isDone ? ', Solved' : ''}">
           <div class="cat-item-left">
             <span class="cat-item-id">#${c.id}</span>
-            ${isDone ? '<span class="ch-check">✓</span>' : ''}
+            ${isDone ? '<span class="ch-check" aria-hidden="true">✓</span>' : ''}
             <span class="cat-item-slug">${c.slug}</span>
             <span class="diff-chip diff-${c.difficulty.toLowerCase()}">${c.difficulty}</span>
-            ${stars > 0 ? `<span class="cat-item-stars">${'★'.repeat(stars)}</span>` : ''}
+            ${stars > 0 ? `<span class="cat-item-stars" aria-hidden="true">${'★'.repeat(stars)}</span>` : ''}
           </div>
           <span class="cat-item-prompt">${this.escapeHtml(c.prompt)}</span>
-        </div>
+        </button>
       `;
     }).join('');
 
@@ -360,41 +399,51 @@ export class CmdSite {
 
     this.container.innerHTML = `
       <div class="cmd-page ${this.fontScale !== 'normal' ? `font-scale-${this.fontScale}` : ''}">
+        <!-- ♿ Skip Navigation Links -->
+        <a href="#cmd-term-input" class="skip-nav-link">Skip to PowerShell Terminal</a>
+        <a href="#main-challenge" class="skip-nav-link">Skip to Challenge Content</a>
+
+        <!-- ♿ Screen Reader Live Announcer -->
+        <div id="a11y-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
         <!-- Top Navbar -->
-        <header class="navbar">
+        <header class="navbar" role="banner">
           <div class="header-content">
             <div class="header-left">
-              <div class="logo-box">
+              <div class="logo-box" aria-hidden="true">
                 <span class="logo-prompt">PS&gt;</span>
               </div>
               <span class="site-title">DYLAN GROW'S POWERSHELL CHALLENGE</span>
             </div>
 
             <div class="header-right">
-              <div class="progress-container" title="${this.solvedIds.size} of ${ChallengesCatalog.length} completed">
-                <div class="progress-bar-bg">
+              <div class="progress-container" role="progressbar" aria-valuenow="${this.solvedIds.size}" aria-valuemin="0" aria-valuemax="${ChallengesCatalog.length}" aria-label="Challenge progress: ${this.solvedIds.size} of ${ChallengesCatalog.length} challenges solved" title="${this.solvedIds.size} of ${ChallengesCatalog.length} completed">
+                <div class="progress-bar-bg" aria-hidden="true">
                   <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
                 </div>
-                <span class="progress-label">${this.solvedIds.size} / ${ChallengesCatalog.length}</span>
+                <span class="progress-label" aria-hidden="true">${this.solvedIds.size} / ${ChallengesCatalog.length}</span>
               </div>
 
-              <button class="font-scale-btn" id="btn-toggle-font" title="Toggle Font Size: Normal (16px) ➔ Large (18px) ➔ XL (20px)">
+              <button class="font-scale-btn" id="btn-toggle-font" aria-label="Font size: ${this.fontScale === 'normal' ? '16px' : this.fontScale === 'lg' ? '18px' : '20px'}. Click to toggle font size" title="Toggle Font Size: Normal (16px) ➔ Large (18px) ➔ XL (20px)">
                 Aa <span class="font-scale-badge">${this.fontScale === 'normal' ? '16px' : this.fontScale === 'lg' ? '18px' : '20px'}</span>
               </button>
 
-              <button class="nav-btn" id="btn-open-cheatsheet" title="PowerShell Command CheatSheet & Examples (Press F1 or ?)">
+              <button class="nav-btn" id="btn-open-cheatsheet" aria-label="Open PowerShell Command CheatSheet (Press F1 or ?)" title="PowerShell Command CheatSheet & Examples (Press F1 or ?)">
                 📖 CheatSheet
               </button>
+              <button class="nav-btn" id="btn-open-stats" aria-label="Open Dylan's Stats Dashboard" title="View your Stats Dashboard: progress, stars, personal bests">
+                📊 Stats
+              </button>
 
-              <button class="nav-btn" id="btn-open-catalog" title="Search all 55 challenges">
+              <button class="nav-btn" id="btn-open-catalog" aria-label="Search all ${ChallengesCatalog.length} challenges in catalog" title="Search all ${ChallengesCatalog.length} challenges">
                 🔍 Catalog
               </button>
 
-              <button class="nav-btn icon-only" id="btn-open-cert" title="View Dylan Grow's Certificate of Mastery">
+              <button class="nav-btn icon-only" id="btn-open-cert" aria-label="View Dylan Grow's Certificate of Mastery" title="View Dylan Grow's Certificate of Mastery">
                 🏆
               </button>
 
-              <button class="nav-btn icon-only" id="btn-reset-progress" title="Reset all progress">
+              <button class="nav-btn icon-only" id="btn-reset-progress" aria-label="Reset all challenge progress" title="Reset all progress">
                 ↺
               </button>
             </div>
@@ -402,23 +451,25 @@ export class CmdSite {
         </header>
 
         <!-- Challenge Navigation Strip -->
-        <div class="challenge-nav-bar">
+        <nav class="challenge-nav-bar" aria-label="Challenge selection">
           <div class="ch-nav-inner">
-            <button class="nav-arrow" id="btn-nav-prev" ${this.currentId === 1 ? 'disabled' : ''} title="Previous Challenge (Ctrl+Left or [)">
+            <button class="nav-arrow" id="btn-nav-prev" ${this.currentId === 1 ? 'disabled' : ''} aria-label="Previous challenge" title="Previous Challenge (Ctrl+Left or [)">
               ◀
             </button>
-            <div class="badges-scroll" id="badges-track">
+            <div class="badges-scroll" id="badges-track" role="tablist" aria-label="Challenges navigation strip">
               ${badgesHtml}
             </div>
-            <button class="nav-arrow" id="btn-nav-next" ${this.currentId === ChallengesCatalog.length ? 'disabled' : ''} title="Next Challenge (Ctrl+Right or ])">
+            <button class="nav-arrow" id="btn-nav-next" ${this.currentId === ChallengesCatalog.length ? 'disabled' : ''} aria-label="Next challenge" title="Next Challenge (Ctrl+Right or ])">
               ▶
             </button>
           </div>
-        </div>
+        </nav>
 
         <!-- Main Challenge Stage -->
-        <main class="challenge-container">
-          <div class="challenge-card">
+        <main class="challenge-container" id="main-challenge" role="main">
+          <section class="challenge-card" aria-labelledby="current-ch-title">
+            <h1 id="current-ch-title" class="sr-only">Challenge #${ch.id}: ${this.escapeHtml(ch.title)}</h1>
+
             <div class="ch-card-top">
               <div class="ch-meta">
                 <span class="ch-number-tag">#${ch.id} of ${ChallengesCatalog.length}</span>
@@ -436,13 +487,13 @@ export class CmdSite {
                 `}
               </div>
               <div class="ch-controls">
-                <button class="toggle-link ${this.showFiles ? 'active' : ''}" id="btn-toggle-files">
+                <button class="toggle-link ${this.showFiles ? 'active' : ''}" id="btn-toggle-files" aria-expanded="${this.showFiles}" aria-controls="files-drawer" aria-label="Toggle virtual workspace files drawer">
                   <span>📁 Workspace Files</span>
                 </button>
-                <button class="toggle-link ${this.showLearn ? 'active' : ''}" id="btn-toggle-learn">
+                <button class="toggle-link ${this.showLearn ? 'active' : ''}" id="btn-toggle-learn" aria-expanded="${this.showLearn}" aria-controls="learn-drawer" aria-label="Toggle hints and concepts drawer">
                   <span>💡 Hints &amp; Syntax</span>
                 </button>
-                <button class="toggle-link ${this.showSolutions ? 'active' : ''}" id="btn-toggle-solutions">
+                <button class="toggle-link ${this.showSolutions ? 'active' : ''}" id="btn-toggle-solutions" aria-expanded="${this.showSolutions}" aria-controls="solutions-drawer" aria-label="Toggle verified solutions drawer">
                   <span>✨ Solutions</span>
                 </button>
               </div>
@@ -453,7 +504,7 @@ export class CmdSite {
             </div>
 
             ${ch.syntaxTip ? `
-              <div class="syntax-tip-box">
+              <div class="syntax-tip-box" aria-label="Syntax tip">
                 <span class="tip-label">Syntax Tip:</span>
                 <code>${this.escapeHtml(ch.syntaxTip)}</code>
               </div>
@@ -461,9 +512,9 @@ export class CmdSite {
 
             <!-- Workspace Files Drawer -->
             ${this.showFiles ? `
-              <div class="files-drawer animate-slide">
+              <div class="files-drawer animate-slide" id="files-drawer" role="region" aria-label="Dylan's Virtual Filesystem (C:\\Users\\Dylan)">
                 <div class="drawer-header">
-                  <span class="drawer-icon">📁</span>
+                  <span class="drawer-icon" aria-hidden="true">📁</span>
                   <span class="drawer-heading">Dylan's Virtual Filesystem (C:\\Users\\Dylan)</span>
                 </div>
                 <div class="drawer-body files-list">${filesHtml}</div>
@@ -472,9 +523,9 @@ export class CmdSite {
 
             <!-- Hints Drawer -->
             ${this.showLearn ? `
-              <div class="learn-drawer animate-slide">
+              <div class="learn-drawer animate-slide" id="learn-drawer" role="region" aria-label="Hints and concepts">
                 <div class="drawer-header">
-                  <span class="drawer-icon">💡</span>
+                  <span class="drawer-icon" aria-hidden="true">💡</span>
                   <span class="drawer-heading">Hints &amp; Concepts</span>
                 </div>
                 <ul class="drawer-hints-list">${hintsHtml}</ul>
@@ -483,9 +534,9 @@ export class CmdSite {
 
             <!-- Solutions Drawer -->
             ${this.showSolutions ? `
-              <div class="solutions-drawer animate-slide">
+              <div class="solutions-drawer animate-slide" id="solutions-drawer" role="region" aria-label="Verified solutions and code-golf pars">
                 <div class="drawer-header">
-                  <span class="drawer-icon">✨</span>
+                  <span class="drawer-icon" aria-hidden="true">✨</span>
                   <span class="drawer-heading">Verified Solutions &amp; Code-Golf Pars</span>
                 </div>
                 <div class="drawer-body">${solutionsHtml}</div>
@@ -494,15 +545,15 @@ export class CmdSite {
 
             <!-- Correct Banner with Golf Stars -->
             ${isSolved ? `
-              <div class="correct-banner animate-slide">
+              <div class="correct-banner animate-slide" role="status" aria-live="polite">
                 <div class="correct-left">
-                  <div class="correct-badge-wrap">
+                  <div class="correct-badge-wrap" aria-hidden="true">
                     <span class="correct-icon">✓</span>
                   </div>
                   <div>
                     <div class="correct-title-row">
                       <span class="correct-title">CORRECT!</span>
-                      <span class="correct-stars-text">${'★'.repeat(bestStars || 1)}</span>
+                      <span class="correct-stars-text" aria-label="${bestStars || 1} stars">${'★'.repeat(bestStars || 1)}</span>
                     </div>
                     <span class="correct-desc">
                       Nicely done, Dylan! Challenge #${ch.id} verified. 
@@ -511,15 +562,15 @@ export class CmdSite {
                   </div>
                 </div>
                 ${this.currentId < ChallengesCatalog.length ? `
-                  <button class="btn-next-challenge" id="btn-next-banner">Next Challenge ➔</button>
+                  <button class="btn-next-challenge" id="btn-next-banner" aria-label="Advance to Next Challenge">Next Challenge ➔</button>
                 ` : `<span class="all-solved-text">🎉 Outstanding Dylan! You completed all ${ChallengesCatalog.length} challenges!</span>`}
               </div>
             ` : ''}
 
             <!-- Terminal Component -->
-            <div class="terminal-wrapper" id="terminal-box">
+            <section class="terminal-wrapper" id="terminal-box" aria-label="Interactive PowerShell Terminal">
               <div class="terminal-titlebar">
-                <div class="term-traffic-lights">
+                <div class="term-traffic-lights" aria-hidden="true">
                   <span class="traffic-dot dot-red"></span>
                   <span class="traffic-dot dot-yellow"></span>
                   <span class="traffic-dot dot-green"></span>
@@ -527,12 +578,12 @@ export class CmdSite {
                 <div class="term-window-title">PowerShell 7.4 — C:\\Users\\Dylan — 80×24</div>
                 <div class="term-right-tools">
                   <span class="reverse-search-hint" title="Press Ctrl+R to search previous command history">Ctrl+R Search</span>
-                  <span id="term-char-counter" class="char-counter">0 chars</span>
-                  <button class="term-clear-btn" id="btn-term-clear" title="Clear terminal output (Ctrl+L)">Clear</button>
+                  <span id="term-char-counter" class="char-counter" aria-live="off">0 chars</span>
+                  <button class="term-clear-btn" id="btn-term-clear" aria-label="Clear terminal output (Ctrl+L)" title="Clear terminal output (Ctrl+L)">Clear</button>
                 </div>
               </div>
 
-              <div class="term-screen" id="term-output-area" role="log" aria-live="polite">
+              <div class="term-screen" id="term-output-area" role="log" aria-live="polite" aria-label="Terminal output log" tabindex="0">
                 <div class="term-line info-text">PowerShell 7.4.2 [Client-Side Simulation Engine]</div>
                 <div class="term-line info-text">Workspace: C:\\Users\\Dylan | User: Dylan Grow</div>
                 <div class="term-line info-text">💡 Tip: Press <code>Ctrl+R</code> to search history. Pipe to <code>Out-GridView</code> (<code>ogv</code>) for GUI table!</div>
@@ -540,7 +591,7 @@ export class CmdSite {
 
               <!-- Terminal Input Row with Real-Time Syntax Overlay -->
               <div class="term-input-row">
-                <span class="term-ps-prompt" id="term-prompt-label">
+                <span class="term-ps-prompt" id="term-prompt-label" aria-hidden="true">
                   ${this.isReverseSearch 
                     ? `<span class="reverse-search-label">(reverse-i-search)\`<b>${this.escapeHtml(this.reverseSearchQuery)}</b>\`:</span>` 
                     : `PS C:\\Users\\Dylan&gt;`}
@@ -559,32 +610,33 @@ export class CmdSite {
                     aria-label="PowerShell command line input"
                   />
                 </div>
-                <button class="term-run-btn" id="btn-submit-cmd" title="Execute command">Enter ↵</button>
+                <button class="term-run-btn" id="btn-submit-cmd" aria-label="Execute command" title="Execute command (Enter)">Enter ↵</button>
               </div>
-            </div>
-          </div>
+            </section>
+          </section>
         </main>
 
         <!-- Search / Jump Catalog Modal -->
         ${this.showCatalog ? `
-          <div class="modal-backdrop animate-fade" id="catalog-modal-backdrop">
+          <div class="modal-backdrop animate-fade" id="catalog-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="catalog-modal-title">
             <div class="modal-card">
               <div class="modal-header">
                 <div class="modal-title-group">
-                  <span class="modal-icon">🔍</span>
-                  <span class="modal-title">Challenges Catalog (${ChallengesCatalog.length} Total)</span>
+                  <span class="modal-icon" aria-hidden="true">🔍</span>
+                  <h2 class="modal-title" id="catalog-modal-title">Challenges Catalog (${ChallengesCatalog.length} Total)</h2>
                 </div>
-                <button class="btn-close-modal" id="btn-close-catalog">✕</button>
+                <button class="btn-close-modal" id="btn-close-catalog" aria-label="Close challenges catalog">✕</button>
               </div>
               <div class="modal-search-box">
                 <input
                   type="text"
                   id="catalog-search-input"
                   placeholder="Search by cmdlet, category, keyword (e.g. 'Get-Process', 'csv', 'filter')..."
+                  aria-label="Search challenges by keyword, cmdlet, or category"
                   value="${this.escapeHtml(this.catalogSearchQuery)}"
                 />
               </div>
-              <div class="catalog-list-scroll">
+              <div class="catalog-list-scroll" role="listbox" aria-label="Challenges list">
                 ${catalogListHtml}
               </div>
             </div>
@@ -632,8 +684,14 @@ export class CmdSite {
       this.openCheatSheet();
     });
 
+    // Stats dashboard button
+    this.container.querySelector('#btn-open-stats')?.addEventListener('click', () => {
+      this.openStats();
+    });
+
     // Certificate button
     this.container.querySelector('#btn-open-cert')?.addEventListener('click', () => {
+      this.lastFocusedElement = this.container.querySelector('#btn-open-cert') as HTMLElement;
       const stats = {
         solvedCount: this.solvedIds.size,
         totalCount: ChallengesCatalog.length,
@@ -641,7 +699,9 @@ export class CmdSite {
         maxStars: ChallengesCatalog.length * 3,
         rankTitle: this.getDylanRank().title
       };
-      const certModal = new CertificateModal(stats);
+      const certModal = new CertificateModal(stats, () => {
+        this.lastFocusedElement?.focus();
+      });
       certModal.show();
     });
 
@@ -653,8 +713,20 @@ export class CmdSite {
       this.attachEvents();
     });
 
-    // Catalog modal open/close
+    // Catalog modal open/close & focus management
+    const closeCatalog = () => {
+      this.showCatalog = false;
+      this.render();
+      this.attachEvents();
+      if (this.lastFocusedElement) {
+        this.lastFocusedElement.focus();
+      } else {
+        this.focusTerminal();
+      }
+    };
+
     this.container.querySelector('#btn-open-catalog')?.addEventListener('click', () => {
+      this.lastFocusedElement = this.container.querySelector('#btn-open-catalog') as HTMLElement;
       this.showCatalog = true;
       this.render();
       this.attachEvents();
@@ -674,19 +746,11 @@ export class CmdSite {
       }
     });
 
-    this.container.querySelector('#btn-close-catalog')?.addEventListener('click', () => {
-      this.showCatalog = false;
-      this.render();
-      this.attachEvents();
-      this.focusTerminal();
-    });
+    this.container.querySelector('#btn-close-catalog')?.addEventListener('click', closeCatalog);
 
     this.container.querySelector('#catalog-modal-backdrop')?.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).id === 'catalog-modal-backdrop') {
-        this.showCatalog = false;
-        this.render();
-        this.attachEvents();
-        this.focusTerminal();
+        closeCatalog();
       }
     });
 
@@ -698,13 +762,33 @@ export class CmdSite {
       });
     });
 
-    // Global keyboard shortcuts for prev/next and CheatSheet
+    // Global keyboard shortcuts for prev/next, CheatSheet, and Catalog focus trap
     window.onkeydown = (e: KeyboardEvent) => {
-      if (this.showCatalog && e.key === 'Escape') {
-        this.showCatalog = false;
-        this.render();
-        this.attachEvents();
-        this.focusTerminal();
+      if (this.showCatalog) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCatalog();
+          return;
+        }
+        if (e.key === 'Tab') {
+          const modalBackdrop = this.container.querySelector('#catalog-modal-backdrop');
+          if (modalBackdrop) {
+            const focusables = Array.from(modalBackdrop.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])'));
+            if (focusables.length > 0) {
+              const first = focusables[0];
+              const last = focusables[focusables.length - 1];
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+                return;
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+                return;
+              }
+            }
+          }
+        }
         return;
       }
       if (e.key === 'F1' || (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName))) {
@@ -876,8 +960,23 @@ export class CmdSite {
             this.runCommand(cmd);
           }
         } else if (e.key === 'Tab') {
-          e.preventDefault();
-          this.handleTabAutocomplete(input);
+          if (e.shiftKey) {
+            // Allow Shift+Tab to naturally move focus backwards out of the input
+            return;
+          }
+          const text = input.value;
+          const parts = text.split(' ');
+          const lastWord = parts[parts.length - 1];
+          if (lastWord && lastWord.trim().length > 0) {
+            e.preventDefault();
+            this.handleTabAutocomplete(input);
+          }
+          // If no token is being typed, standard Tab moves focus forward to #btn-submit-cmd
+        } else if (e.key === 'Escape') {
+          if (this.isReverseSearch) {
+            e.preventDefault();
+            this.exitReverseSearch();
+          }
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           if (this.history.length > 0 && this.historyIndex > 0) {
@@ -1088,6 +1187,7 @@ export class CmdSite {
 
         this.saveProgress();
         this.playSuccessSound();
+        this.burstConfetti();
 
         const stars = this.getStarsForChallenge(ch.id);
         const starText = '★'.repeat(stars);
@@ -1096,6 +1196,7 @@ export class CmdSite {
         successLine.className = 'term-line correct-text';
         successLine.innerText = `CORRECT! [Challenge #${ch.id} Solved: ${cmd.length} chars • ${starText}]`;
         outputArea.appendChild(successLine);
+        this.announce(`Correct! Challenge ${ch.id} verified. Solved in ${cmd.length} characters with ${stars} stars.`);
 
         // Refresh UI banner
         setTimeout(() => {
@@ -1112,6 +1213,67 @@ export class CmdSite {
     }
 
     outputArea.scrollTop = outputArea.scrollHeight;
+  }
+
+  private burstConfetti(): void {
+    const canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-hidden', 'true');
+    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { canvas.remove(); return; }
+
+    const colors = ['#00f0ff', '#f59e0b', '#10b981', '#a855f7', '#38bdf8', '#f87171', '#4ade80', '#fb923c'];
+    const particles: { x: number; y: number; vx: number; vy: number; color: string; size: number; alpha: number; rot: number; drot: number }[] = [];
+
+    for (let i = 0; i < 80; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height * 0.4,
+        vx: (Math.random() - 0.5) * 6,
+        vy: Math.random() * 4 + 2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: Math.random() * 8 + 4,
+        alpha: 1,
+        rot: Math.random() * Math.PI * 2,
+        drot: (Math.random() - 0.5) * 0.2
+      });
+    }
+
+    const start = performance.now();
+    const duration = 2000;
+
+    const frame = (now: number) => {
+      const elapsed = now - start;
+      const progress = elapsed / duration;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.15; // gravity
+        p.rot += p.drot;
+        p.alpha = Math.max(0, 1 - progress * 1.2);
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        ctx.restore();
+      }
+
+      if (elapsed < duration) {
+        requestAnimationFrame(frame);
+      } else {
+        canvas.remove();
+      }
+    };
+
+    requestAnimationFrame(frame);
   }
 
   private escapeHtml(str: string): string {
